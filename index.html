@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>HuBattle — Битва за Ху Гарден</title>
     <style>
-        /* (все стили без изменений, оставляем как было) */
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
         body { background: #0a0c14; font-family: 'Segoe UI', 'Inter', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
         .battle-fullscreen { display: flex; flex-direction: column; height: 100vh; width: 100%; background: #0a0c14; }
@@ -30,7 +29,7 @@
         .cooldown-indicator { background: #1e1f2e; padding: 4px 14px; border-radius: 40px; font-family: monospace; font-weight: bold; font-size: 0.85rem; color: white; }
         .stats { display: flex; gap: 12px; font-size: 0.75rem; color: white; }
         .canvas-container { flex: 1; position: relative; overflow: hidden; background: #05070c; cursor: crosshair; }
-        #battleCanvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); image-rendering: crisp-edges; image-rendering: pixelated; cursor: crosshair; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        #battleCanvas { position: absolute; top: 0; left: 0; image-rendering: crisp-edges; image-rendering: pixelated; cursor: crosshair; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
         .players-panel { position: fixed; bottom: 15px; left: 15px; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); padding: 8px 15px; border-radius: 20px; font-size: 0.75rem; color: #ffaa88; font-family: monospace; max-width: 400px; z-index: 200; pointer-events: none; overflow-x: auto; white-space: nowrap; }
         .zoom-controls { position: fixed; bottom: 15px; right: 15px; display: flex; gap: 8px; z-index: 200; }
         .zoom-btn { background: #1e1f2e; border: none; width: 36px; height: 36px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; color: white; cursor: pointer; backdrop-filter: blur(4px); box-shadow: 0 2px 8px black; }
@@ -64,7 +63,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
 
 <script>
-    // ========== КОНФИГУРАЦИЯ FIREBASE ==========
+    // ========== КОНФИГУРАЦИЯ FIREBASE (ваша) ==========
     const firebaseConfig = {
         apiKey: "AIzaSyCFWI0QOG02IW1Pqdo6xd6uiTN0stjWV3Q",
         authDomain: "hubattle.firebaseapp.com",
@@ -109,7 +108,6 @@
     let scale = 1, offsetX = 0, offsetY = 0;
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
-    let canvasCenterX = 0, canvasCenterY = 0;
 
     let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, playersPanel;
     let audioCtx = null;
@@ -171,7 +169,7 @@
         if (playersCountSpan) playersCountSpan.innerText = count;
     }
 
-    // ========== ОТРИСОВКА И ТРАНСФОРМАЦИИ ==========
+    // ========== ОТРИСОВКА И ПОЗИЦИОНИРОВАНИЕ ==========
     function drawCanvas() {
         if (!canvas || !ctx) return;
         const w = MAP_WIDTH * PIXEL_SIZE;
@@ -179,7 +177,7 @@
         canvas.width = w;
         canvas.height = h;
         canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-        canvas.style.transformOrigin = "center center";
+        canvas.style.transformOrigin = "0 0";
         for (let row = 0; row < MAP_HEIGHT; row++) {
             for (let col = 0; col < MAP_WIDTH; col++) {
                 const idx = row * MAP_WIDTH + col;
@@ -194,30 +192,26 @@
             for (let x = 0; x <= MAP_WIDTH; x++) { ctx.moveTo(x * PIXEL_SIZE, 0); ctx.lineTo(x * PIXEL_SIZE, h); ctx.stroke(); ctx.moveTo(0, x * PIXEL_SIZE); ctx.lineTo(w, x * PIXEL_SIZE); ctx.stroke(); }
         }
     }
-    function updateCanvasPosition() {
+
+    // Новая функция позиционирования: canvas всегда в левом верхнем углу контейнера,
+    // смещение задаётся через offsetX/offsetY, ограничения только чтобы не уходил за края
+    function applyTransform() {
         if (!canvas || !container) return;
-        const rect = container.getBoundingClientRect();
-        const w = MAP_WIDTH * PIXEL_SIZE * scale;
-        const h = MAP_HEIGHT * PIXEL_SIZE * scale;
-        canvasCenterX = (rect.width - w) / 2;
-        canvasCenterY = (rect.height - h) / 2;
-        canvas.style.left = `${canvasCenterX + offsetX}px`;
-        canvas.style.top = `${canvasCenterY + offsetY}px`;
-    }
-    function clampAndCenter() {
-        if (!canvas || !container) return;
-        const rect = container.getBoundingClientRect();
-        const w = MAP_WIDTH * PIXEL_SIZE * scale;
-        const h = MAP_HEIGHT * PIXEL_SIZE * scale;
-        const maxX = Math.max(0, w - rect.width) / 2;
-        const maxY = Math.max(0, h - rect.height) / 2;
-        offsetX = Math.min(maxX, Math.max(-maxX, offsetX));
-        offsetY = Math.min(maxY, Math.max(-maxY, offsetY));
-        updateCanvasPosition();
+        const containerRect = container.getBoundingClientRect();
+        const canvasW = MAP_WIDTH * PIXEL_SIZE * scale;
+        const canvasH = MAP_HEIGHT * PIXEL_SIZE * scale;
+        // Ограничиваем смещение, чтобы холст не выходил за пределы контейнера полностью
+        const minX = Math.min(0, containerRect.width - canvasW);
+        const maxX = 0;
+        const minY = Math.min(0, containerRect.height - canvasH);
+        const maxY = 0;
+        offsetX = Math.min(maxX, Math.max(minX, offsetX));
+        offsetY = Math.min(maxY, Math.max(minY, offsetY));
+        canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
         drawCanvas();
     }
 
-    // ========== ИСПРАВЛЕННЫЙ ЗУМ ПОД КУРСОР (ГАРАНТИРОВАННО РАБОТАЕТ) ==========
+    // ========== ЗУМ ПОД КУРСОР (ПРОВЕРЕННАЯ МАТЕМАТИКА) ==========
     function zoomAtPoint(delta, clientX, clientY) {
         if (!canvas || !container) return;
 
@@ -226,57 +220,74 @@
         newScale = Math.min(5, Math.max(0.5, newScale));
         if (newScale === oldScale) return;
 
-        // Получаем прямоугольник canvas в координатах окна
-        const canvasRect = canvas.getBoundingClientRect();
+        // Координаты мыши относительно контейнера
+        const containerRect = container.getBoundingClientRect();
+        const mouseX = clientX - containerRect.left;
+        const mouseY = clientY - containerRect.top;
 
-        // Координаты мыши относительно canvas (в пикселях экрана)
-        const mouseCanvasX = clientX - canvasRect.left;
-        const mouseCanvasY = clientY - canvasRect.top;
+        // Текущее положение canvas в контейнере (до зумирования)
+        const canvasLeft = offsetX;
+        const canvasTop = offsetY;
+        const canvasWidth = MAP_WIDTH * PIXEL_SIZE * oldScale;
+        const canvasHeight = MAP_HEIGHT * PIXEL_SIZE * oldScale;
 
-        // Если мышь вне canvas — центрируем зум
-        if (mouseCanvasX < 0 || mouseCanvasY < 0 || mouseCanvasX > canvasRect.width || mouseCanvasY > canvasRect.height) {
-            scale = newScale;
-            clampAndCenter();
-            return;
-        }
-
-        // Мировые координаты точки под курсором (до зумирования)
-        const worldX = mouseCanvasX / oldScale;
-        const worldY = mouseCanvasY / oldScale;
+        // Координаты мыши в мировых координатах (пиксели холста)
+        const worldX = (mouseX - canvasLeft) / oldScale;
+        const worldY = (mouseY - canvasTop) / oldScale;
 
         // Меняем масштаб
         scale = newScale;
 
-        // После изменения масштаба эта же точка должна остаться под мышью
-        const newMouseCanvasX = worldX * scale;
-        const newMouseCanvasY = worldY * scale;
+        // Новые размеры холста после зумирования
+        const newCanvasWidth = MAP_WIDTH * PIXEL_SIZE * scale;
+        const newCanvasHeight = MAP_HEIGHT * PIXEL_SIZE * scale;
 
-        // Корректируем смещение, чтобы точка не сдвинулась
-        offsetX += (mouseCanvasX - newMouseCanvasX) / scale;
-        offsetY += (mouseCanvasY - newMouseCanvasY) / scale;
+        // Нужно подобрать смещение так, чтобы точка (worldX, worldY) оказалась под мышью
+        const newLeft = mouseX - worldX * scale;
+        const newTop = mouseY - worldY * scale;
 
-        clampAndCenter();
+        offsetX = newLeft;
+        offsetY = newTop;
+
+        // Применяем ограничения и отрисовываем
+        applyTransform();
     }
 
     function resetView() {
         scale = 1;
         offsetX = 0;
         offsetY = 0;
-        clampAndCenter();
+        applyTransform();
     }
 
     // ========== ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ПОД КУРСОРОМ ==========
     function getPixelIndexFromClick(clientX, clientY) {
-        if (!canvas) return -1;
-        const rect = canvas.getBoundingClientRect();
-        const relX = clientX - rect.left;
-        const relY = clientY - rect.top;
-        if (relX < 0 || relY < 0 || relX > rect.width || relY > rect.height) return -1;
-        const canvasX = relX / scale;
-        const canvasY = relY / scale;
+        if (!canvas || !container) return -1;
+        const containerRect = container.getBoundingClientRect();
+        const canvasLeft = offsetX;
+        const canvasTop = offsetY;
+        const canvasWidth = MAP_WIDTH * PIXEL_SIZE * scale;
+        const canvasHeight = MAP_HEIGHT * PIXEL_SIZE * scale;
+
+        // Координаты клика относительно контейнера
+        const mouseX = clientX - containerRect.left;
+        const mouseY = clientY - containerRect.top;
+
+        // Проверяем, попал ли клик в область canvas
+        if (mouseX < canvasLeft || mouseX > canvasLeft + canvasWidth ||
+            mouseY < canvasTop || mouseY > canvasTop + canvasHeight) {
+            return -1;
+        }
+
+        // Координаты в мире пикселей (без масштаба)
+        const canvasX = (mouseX - canvasLeft) / scale;
+        const canvasY = (mouseY - canvasTop) / scale;
+
         const col = Math.floor(canvasX / PIXEL_SIZE);
         const row = Math.floor(canvasY / PIXEL_SIZE);
-        if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) return row * MAP_WIDTH + col;
+        if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) {
+            return row * MAP_WIDTH + col;
+        }
         return -1;
     }
 
@@ -421,7 +432,7 @@
         if (previewColorDiv) previewColorDiv.style.backgroundColor = selectedColor;
     }
 
-    // ========== ПАННОРАМИРОВАНИЕ ЛЕВОЙ И СРЕДНЕЙ КНОПКОЙ ==========
+    // ========== ПАННОРАМИРОВАНИЕ ==========
     function setupPanAndZoom() {
         if (!container) return;
         const onMouseDown = (e) => {
@@ -437,7 +448,7 @@
             if (!isDragging) return;
             offsetX = e.clientX - dragStart.x;
             offsetY = e.clientY - dragStart.y;
-            clampAndCenter();
+            applyTransform();
         };
         const onMouseUp = () => { isDragging = false; container.style.cursor = "crosshair"; };
         container.addEventListener("mousedown", onMouseDown);
@@ -489,9 +500,9 @@
             updateAuthUI();
         }
 
-        window.addEventListener('resize', () => setTimeout(() => clampAndCenter(), 100));
+        window.addEventListener('resize', () => { applyTransform(); });
         document.body.addEventListener("click", () => { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); }, { once: true });
-        setTimeout(() => clampAndCenter(), 100);
+        setTimeout(() => applyTransform(), 100);
     }
     init();
 </script>
