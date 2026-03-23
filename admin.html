@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>HuBattle — Админ-панель</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1f2e;
+            font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+            padding: 20px;
+            color: #eee;
+        }
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .controls {
+            background: #0f1219;
+            padding: 15px 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        button, input {
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: none;
+            background: #2a2f3e;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        button:hover {
+            background: #ff6b6b;
+        }
+        input {
+            background: #1e1f2e;
+            border: 1px solid #ff6b6b;
+            width: 80px;
+            text-align: center;
+        }
+        .canvas-container {
+            background: #05070c;
+            border-radius: 20px;
+            padding: 20px;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+        }
+        canvas {
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 8px 16px;
+            background: #0f1219;
+            border-radius: 30px;
+            display: inline-block;
+        }
+        .login-panel {
+            background: #0f1219;
+            padding: 30px;
+            border-radius: 30px;
+            text-align: center;
+            max-width: 400px;
+            margin: 100px auto;
+        }
+        .login-panel input {
+            width: 200px;
+            margin: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        .warning {
+            background: #ff6b6b33;
+            border-left: 4px solid #ff6b6b;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="admin-container" id="app">
+    <div id="loginPanel" class="login-panel">
+        <h2>🔐 Вход в админ-панель</h2>
+        <input type="password" id="adminPassword" placeholder="Пароль">
+        <button id="loginBtn">Войти</button>
+    </div>
+
+    <div id="adminContent" class="hidden">
+        <h1>⚙️ HuBattle — Администрирование</h1>
+        <div class="controls">
+            <button id="clearAllBtn">🧹 Очистить весь холст</button>
+            <button id="resetStatsBtn">📊 Сбросить счётчик пикселей</button>
+            <div style="margin-left: auto; display: flex; gap: 10px;">
+                <label>Ширина: <input type="number" id="newWidth" min="10" max="200" value="100"></label>
+                <label>Высота: <input type="number" id="newHeight" min="10" max="200" value="60"></label>
+                <button id="resizeBtn">🔄 Изменить размер</button>
+            </div>
+        </div>
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="adminCanvas"></canvas>
+        </div>
+        <div class="status" id="statusMsg">Холст загружен. Кликните по пикселю, чтобы стереть его.</div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+
+<script>
+    // ========== КОНФИГУРАЦИЯ FIREBASE ==========
+    const firebaseConfig = {
+        apiKey: "AIzaSyCFWI0QOG02IW1Pqdo6xd6uiTN0stjWV3Q",
+        authDomain: "hubattle.firebaseapp.com",
+        databaseURL: "https://hubattle-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "hubattle",
+        storageBucket: "hubattle.firebasestorage.app",
+        messagingSenderId: "746603857511",
+        appId: "1:746603857511:web:edf112bab36a5c9aa376c2",
+        measurementId: "G-GGQ14FW7LF"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const mapRef = db.ref('map');
+    const totalRef = db.ref('total');
+    const configRef = db.ref('config'); // для хранения размеров
+
+    // ========== ПАРАМЕТРЫ ХОЛСТА ==========
+    let MAP_WIDTH = 100;
+    let MAP_HEIGHT = 60;
+    const PIXEL_SIZE = 12;
+    let pixelMap = [];
+    let canvas, ctx, container;
+
+    // ========== АВТОРИЗАЦИЯ ==========
+    const ADMIN_PASSWORD = "admin123"; // смените на свой пароль
+
+    function checkAuth() {
+        const stored = localStorage.getItem("admin_auth");
+        if (stored === "true") {
+            document.getElementById("loginPanel").classList.add("hidden");
+            document.getElementById("adminContent").classList.remove("hidden");
+            initAdmin();
+        }
+    }
+
+    document.getElementById("loginBtn").addEventListener("click", () => {
+        const pass = document.getElementById("adminPassword").value;
+        if (pass === ADMIN_PASSWORD) {
+            localStorage.setItem("admin_auth", "true");
+            document.getElementById("loginPanel").classList.add("hidden");
+            document.getElementById("adminContent").classList.remove("hidden");
+            initAdmin();
+        } else {
+            alert("Неверный пароль");
+        }
+    });
+
+    // ========== ЗАГРУЗКА КОНФИГУРАЦИИ И КАРТЫ ==========
+    function loadConfig() {
+        return new Promise((resolve) => {
+            configRef.once('value', (snap) => {
+                const config = snap.val();
+                if (config && config.width && config.height) {
+                    MAP_WIDTH = config.width;
+                    MAP_HEIGHT = config.height;
+                }
+                // обновим поля ввода
+                document.getElementById("newWidth").value = MAP_WIDTH;
+                document.getElementById("newHeight").value = MAP_HEIGHT;
+                resolve();
+            });
+        });
+    }
+
+    function loadMapFromFirebase() {
+        mapRef.once('value', (snap) => {
+            const data = snap.val();
+            if (data && data.length === MAP_WIDTH * MAP_HEIGHT) {
+                pixelMap = data;
+            } else {
+                initMap();
+                saveMapToFirebase();
+            }
+            drawCanvas();
+            updateStatus("Холст загружен");
+        });
+    }
+
+    function initMap() {
+        pixelMap = new Array(MAP_WIDTH * MAP_HEIGHT);
+        for (let i = 0; i < pixelMap.length; i++) pixelMap[i] = "#FFFFFF";
+    }
+
+    function saveMapToFirebase() {
+        mapRef.set(pixelMap);
+        // также сохраняем размеры в конфиг
+        configRef.set({ width: MAP_WIDTH, height: MAP_HEIGHT });
+    }
+
+    function drawCanvas() {
+        if (!canvas || !ctx) return;
+        const w = MAP_WIDTH * PIXEL_SIZE;
+        const h = MAP_HEIGHT * PIXEL_SIZE;
+        canvas.width = w;
+        canvas.height = h;
+        for (let row = 0; row < MAP_HEIGHT; row++) {
+            for (let col = 0; col < MAP_WIDTH; col++) {
+                const idx = row * MAP_WIDTH + col;
+                ctx.fillStyle = pixelMap[idx];
+                ctx.fillRect(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE - 0.5, PIXEL_SIZE - 0.5);
+            }
+        }
+        // сетка
+        ctx.beginPath();
+        ctx.strokeStyle = "#cccccc";
+        ctx.lineWidth = 0.5;
+        for (let x = 0; x <= MAP_WIDTH; x++) {
+            ctx.moveTo(x * PIXEL_SIZE, 0);
+            ctx.lineTo(x * PIXEL_SIZE, h);
+            ctx.stroke();
+            ctx.moveTo(0, x * PIXEL_SIZE);
+            ctx.lineTo(w, x * PIXEL_SIZE);
+            ctx.stroke();
+        }
+    }
+
+    function updateStatus(msg) {
+        const el = document.getElementById("statusMsg");
+        el.innerText = msg;
+        setTimeout(() => {
+            if (el.innerText === msg) {
+                el.innerText = "Холст загружен. Кликните по пикселю, чтобы стереть его.";
+            }
+        }, 2000);
+    }
+
+    // ========== ОБРАБОТЧИКИ ==========
+    function handleCanvasClick(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+        const col = Math.floor(mouseX / PIXEL_SIZE);
+        const row = Math.floor(mouseY / PIXEL_SIZE);
+        if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) {
+            const idx = row * MAP_WIDTH + col;
+            pixelMap[idx] = "#FFFFFF";
+            drawCanvas();
+            saveMapToFirebase();
+            updateStatus(`Стёрт пиксель (${row},${col})`);
+        }
+    }
+
+    function clearAll() {
+        if (confirm("Вы уверены, что хотите очистить весь холст? Это действие необратимо.")) {
+            for (let i = 0; i < pixelMap.length; i++) pixelMap[i] = "#FFFFFF";
+            drawCanvas();
+            saveMapToFirebase();
+            updateStatus("Весь холст очищен");
+        }
+    }
+
+    function resetStats() {
+        if (confirm("Сбросить счётчик поставленных пикселей?")) {
+            totalRef.set(0);
+            updateStatus("Счётчик сброшен");
+        }
+    }
+
+    function resizeCanvas() {
+        const newW = parseInt(document.getElementById("newWidth").value);
+        const newH = parseInt(document.getElementById("newHeight").value);
+        if (isNaN(newW) || isNaN(newH) || newW < 10 || newW > 200 || newH < 10 || newH > 200) {
+            alert("Размеры должны быть от 10 до 200");
+            return;
+        }
+        if (newW === MAP_WIDTH && newH === MAP_HEIGHT) {
+            alert("Размеры не изменились");
+            return;
+        }
+        if (confirm(`Изменить размер холста на ${newW}x${newH}? Все пиксели за пределами новых границ будут удалены.`)) {
+            // Сохраняем старую карту и размеры
+            const oldMap = pixelMap;
+            const oldW = MAP_WIDTH;
+            const oldH = MAP_HEIGHT;
+            // Устанавливаем новые размеры
+            MAP_WIDTH = newW;
+            MAP_HEIGHT = newH;
+            // Создаём новый массив, заполняем белым
+            const newMap = new Array(MAP_WIDTH * MAP_HEIGHT);
+            for (let i = 0; i < newMap.length; i++) newMap[i] = "#FFFFFF";
+            // Копируем пиксели, которые попадают в новые границы
+            for (let row = 0; row < Math.min(oldH, newH); row++) {
+                for (let col = 0; col < Math.min(oldW, newW); col++) {
+                    const oldIdx = row * oldW + col;
+                    const newIdx = row * newW + col;
+                    newMap[newIdx] = oldMap[oldIdx];
+                }
+            }
+            pixelMap = newMap;
+            drawCanvas();
+            saveMapToFirebase();
+            updateStatus(`Размер холста изменён на ${newW}x${newH}`);
+            // обновим поля ввода (на случай, если они уже совпадают)
+            document.getElementById("newWidth").value = newW;
+            document.getElementById("newHeight").value = newH;
+        }
+    }
+
+    // ========== ИНИЦИАЛИЗАЦИЯ АДМИНКИ ==========
+    async function initAdmin() {
+        canvas = document.getElementById("adminCanvas");
+        ctx = canvas.getContext("2d");
+        container = document.getElementById("canvasContainer");
+
+        await loadConfig();       // загружаем сохранённые размеры (если есть)
+        await loadMapFromFirebase(); // загружаем карту
+
+        canvas.addEventListener("click", handleCanvasClick);
+        document.getElementById("clearAllBtn").addEventListener("click", clearAll);
+        document.getElementById("resetStatsBtn").addEventListener("click", resetStats);
+        document.getElementById("resizeBtn").addEventListener("click", resizeCanvas);
+    }
+
+    checkAuth();
+</script>
+</body>
+</html>
