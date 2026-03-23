@@ -973,5 +973,30 @@
     
     init();
 </script>
+    <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+
+<script>
+  // 🔥 ЗАМЕНИТЕ ЭТИ ДАННЫЕ НА ВАШИ (скопируйте из консоли Firebase)
+  const firebaseConfig = {
+    apiKey: "ВАШ_API_KEY",
+    authDomain: "ВАШ_AUTH_DOMAIN",
+    projectId: "ВАШ_PROJECT_ID",
+    storageBucket: "ВАШ_STORAGE_BUCKET",
+    messagingSenderId: "ВАШ_MESSAGING_SENDER_ID",
+    appId: "ВАШ_APP_ID",
+    databaseURL: "ВАШ_DATABASE_URL"   // обычно вида https://...-default-rtdb.firebaseio.com
+  };
+
+  // Инициализация Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // Ссылки на узлы базы данных
+  const mapRef = db.ref('map');       // будет хранить все пиксели
+  const totalRef = db.ref('total');   // общее количество поставленных пикселей
+  const playersRef = db.ref('players'); // игроки онлайн
+</script>
 </body>
 </html>
