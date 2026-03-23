@@ -360,15 +360,35 @@
     </div>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+
 <script>
-    // ========== КОНФИГУРАЦИЯ ==========
+    // ========== КОНФИГУРАЦИЯ FIREBASE (ЗАМЕНИТЕ НА ВАШИ ДАННЫЕ) ==========
+    const firebaseConfig = {
+        apiKey: "ВАШ_API_KEY",
+        authDomain: "ВАШ_AUTH_DOMAIN",
+        projectId: "ВАШ_PROJECT_ID",
+        storageBucket: "ВАШ_STORAGE_BUCKET",
+        messagingSenderId: "ВАШ_MESSAGING_SENDER_ID",
+        appId: "ВАШ_APP_ID",
+        databaseURL: "ВАШ_DATABASE_URL"
+    };
+
+    // Инициализация
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const mapRef = db.ref('map');
+    const totalRef = db.ref('total');
+    const playersRef = db.ref('players');
+
+    // ========== КОНФИГУРАЦИЯ ИГРЫ ==========
     const MAP_WIDTH = 100;
     const MAP_HEIGHT = 60;
     const PIXEL_SIZE = 12;
     const COOLDOWN_SECONDS = 3;
-    const PLAYER_TIMEOUT = 10000; // 10 секунд бездействия — игрок офлайн
-    
-    // ПАЛИТРА (40 цветов)
+
     const PALETTE = [
         "#FF4444", "#FF8844", "#FFDD44", "#88FF44", "#44FF88",
         "#44FFDD", "#44AAFF", "#8844FF", "#FF44CC", "#FFFFFF",
@@ -379,89 +399,97 @@
         "#D4AF37", "#CD5C5C", "#6495ED", "#DC143C", "#00FA9A",
         "#FF4500", "#32CD32", "#FF1493", "#00BFFF", "#FFD700"
     ];
-    
-    // ---------- ГЛОБАЛЬНОЕ СОСТОЯНИЕ ----------
+
     let pixelMap = [];
     let totalPlaced = 0;
     let currentUser = null;
     let userCooldowns = new Map();
     let selectedColor = PALETTE[0];
-    
-    // Canvas и трансформации
+
     let canvas, ctx, container;
-    let scale = 1;
-    let offsetX = 0, offsetY = 0;
+    let scale = 1, offsetX = 0, offsetY = 0;
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     let canvasCenterX = 0, canvasCenterY = 0;
-    
-    // DOM элементы
+
     let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, messageDiv, playersPanel;
-    
-    // Звук
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
-    let heartbeatInterval = null;
-    
+
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
         pixelMap = new Array(MAP_WIDTH * MAP_HEIGHT);
-        for (let i = 0; i < pixelMap.length; i++) {
-            pixelMap[i] = "#FFFFFF";
-        }
+        for (let i = 0; i < pixelMap.length; i++) pixelMap[i] = "#FFFFFF";
     }
-    
-    // Сохранение карты и общей статистики в localStorage
-    function saveMapToLocal() {
-        localStorage.setItem("hubattle_map", JSON.stringify(pixelMap));
-        localStorage.setItem("hubattle_total", totalPlaced);
+
+    // ========== РАБОТА С FIREBASE ==========
+    function saveMapToFirebase() {
+        mapRef.set(pixelMap);
+        totalRef.set(totalPlaced);
     }
-    
-    function loadMapFromLocal() {
-        const savedMap = localStorage.getItem("hubattle_map");
-        if (savedMap) {
-            try {
-                const parsed = JSON.parse(savedMap);
-                if (parsed.length === MAP_WIDTH * MAP_HEIGHT) {
-                    pixelMap = parsed;
-                } else {
-                    initMap();
+
+    function loadMapFromFirebase() {
+        mapRef.once('value', (snap) => {
+            const data = snap.val();
+            if (data && data.length === MAP_WIDTH * MAP_HEIGHT) {
+                pixelMap = data;
+                drawCanvas();
+            } else {
+                initMap();
+                saveMapToFirebase();
+                drawCanvas();
+            }
+        });
+        totalRef.once('value', (snap) => {
+            if (snap.val() !== null) totalPlaced = snap.val();
+            updateStats();
+        });
+    }
+
+    function listenForChanges() {
+        mapRef.on('value', (snap) => {
+            const newMap = snap.val();
+            if (newMap) {
+                let changed = false;
+                for (let i = 0; i < newMap.length; i++) {
+                    if (pixelMap[i] !== newMap[i]) {
+                        pixelMap[i] = newMap[i];
+                        changed = true;
+                    }
                 }
-            } catch(e) { initMap(); }
-        } else {
-            initMap();
-        }
-        
-        const savedTotal = localStorage.getItem("hubattle_total");
-        totalPlaced = savedTotal ? parseInt(savedTotal) : 0;
-        updateStats();
+                if (changed) drawCanvas();
+            }
+        });
+        totalRef.on('value', (snap) => {
+            const newTotal = snap.val();
+            if (newTotal !== null && newTotal !== totalPlaced) {
+                totalPlaced = newTotal;
+                updateStats();
+            }
+        });
     }
-    
-    // ========== МУЛЬТИПЛЕЕР: ИГРОКИ (ЛОКАЛЬНЫЙ, ТОЛЬКО ДЛЯ РАЗНЫХ ВКЛАДОК) ==========
+
     function updatePlayerPresence() {
         if (!currentUser) return;
-        const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
-        players[currentUser.username] = Date.now();
-        localStorage.setItem("hubattle_players", JSON.stringify(players));
+        playersRef.child(currentUser.username).set({ lastSeen: Date.now(), avatar: currentUser.avatar });
+        playersRef.child(currentUser.username).onDisconnect().remove();
     }
-    
-    function getOnlinePlayers() {
-        const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
-        const now = Date.now();
-        const online = [];
-        for (const [name, timestamp] of Object.entries(players)) {
-            if (now - timestamp < PLAYER_TIMEOUT) {
-                online.push(name);
+
+    function listenForPlayers() {
+        playersRef.on('value', (snap) => {
+            const playersData = snap.val() || {};
+            const now = Date.now();
+            const online = [];
+            for (const [name, data] of Object.entries(playersData)) {
+                if (now - data.lastSeen < 10000) online.push(name);
             }
-        }
-        return online.sort();
+            updatePlayersUI(online);
+        });
     }
-    
-    function updatePlayersUI() {
-        const online = getOnlinePlayers();
+
+    function updatePlayersUI(online) {
         const count = online.length;
-        
         if (count === 0) {
             playersPanel.innerHTML = "👥 ожидание игроков...";
         } else {
@@ -470,66 +498,16 @@
         }
         if (playersCountSpan) playersCountSpan.innerText = count;
     }
-    
-    function cleanOldPlayers() {
-        const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
-        const now = Date.now();
-        let changed = false;
-        for (const [name, timestamp] of Object.entries(players)) {
-            if (now - timestamp >= PLAYER_TIMEOUT) {
-                delete players[name];
-                changed = true;
-            }
-        }
-        if (changed) {
-            localStorage.setItem("hubattle_players", JSON.stringify(players));
-        }
-        updatePlayersUI();
-    }
-    
-    // ========== СИНХРОНИЗАЦИЯ ХОЛСТА МЕЖДУ ВКЛАДКАМИ ==========
-    function syncCanvasFromStorage() {
-        const savedMap = localStorage.getItem("hubattle_map");
-        if (savedMap) {
-            try {
-                const parsed = JSON.parse(savedMap);
-                if (parsed.length === MAP_WIDTH * MAP_HEIGHT) {
-                    let changed = false;
-                    for (let i = 0; i < parsed.length; i++) {
-                        if (pixelMap[i] !== parsed[i]) {
-                            pixelMap[i] = parsed[i];
-                            changed = true;
-                        }
-                    }
-                    if (changed) {
-                        drawCanvas();
-                    }
-                }
-            } catch(e) { }
-        }
-        
-        const savedTotal = localStorage.getItem("hubattle_total");
-        if (savedTotal) {
-            const newTotal = parseInt(savedTotal);
-            if (newTotal !== totalPlaced) {
-                totalPlaced = newTotal;
-                updateStats();
-            }
-        }
-    }
-    
-    // ========== ОТРИСОВКА CANVAS ==========
+
+    // ========== ОТРИСОВКА И ТРАНСФОРМАЦИИ ==========
     function drawCanvas() {
         if (!canvas || !ctx) return;
-        
         const w = MAP_WIDTH * PIXEL_SIZE;
         const h = MAP_HEIGHT * PIXEL_SIZE;
         canvas.width = w;
         canvas.height = h;
-        
         canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
         canvas.style.transformOrigin = "center center";
-        
         for (let row = 0; row < MAP_HEIGHT; row++) {
             for (let col = 0; col < MAP_WIDTH; col++) {
                 const idx = row * MAP_WIDTH + col;
@@ -537,7 +515,6 @@
                 ctx.fillRect(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE - 0.5, PIXEL_SIZE - 0.5);
             }
         }
-        
         if (scale > 1.5) {
             ctx.beginPath();
             ctx.strokeStyle = "#00000030";
@@ -552,10 +529,9 @@
             }
         }
     }
-    
+
     function updateCanvasPosition() {
         if (!canvas || !container) return;
-        
         const rect = container.getBoundingClientRect();
         const w = MAP_WIDTH * PIXEL_SIZE * scale;
         const h = MAP_HEIGHT * PIXEL_SIZE * scale;
@@ -564,88 +540,69 @@
         canvas.style.left = `${canvasCenterX + offsetX}px`;
         canvas.style.top = `${canvasCenterY + offsetY}px`;
     }
-    
+
     function clampAndCenter() {
         if (!canvas || !container) return;
-        
         const rect = container.getBoundingClientRect();
         const w = MAP_WIDTH * PIXEL_SIZE * scale;
         const h = MAP_HEIGHT * PIXEL_SIZE * scale;
-        
         const maxX = Math.max(0, w - rect.width) / 2;
         const maxY = Math.max(0, h - rect.height) / 2;
         offsetX = Math.min(maxX, Math.max(-maxX, offsetX));
         offsetY = Math.min(maxY, Math.max(-maxY, offsetY));
-        
         updateCanvasPosition();
         drawCanvas();
     }
-    
-    // ========== ИСПРАВЛЕННЫЙ ЗУМ ПОД КУРСОР ==========
+
+    // ========== ЗУМ ПОД КУРСОР ==========
     function zoomAtPoint(delta, clientX, clientY) {
         if (!canvas || !container) return;
-        
         const oldScale = scale;
         let newScale = scale + delta;
         newScale = Math.min(5, Math.max(0.5, newScale));
         if (newScale === scale) return;
-        
-        // Получаем координаты мыши относительно контейнера
+
         const containerRect = container.getBoundingClientRect();
         const mouseX = clientX - containerRect.left;
         const mouseY = clientY - containerRect.top;
-        
-        // Получаем текущее положение canvas (до изменения масштаба)
-        const canvasRect = canvas.getBoundingClientRect();
-        
-        // Координаты мыши в мировых координатах холста (до масштабирования)
-        // Используем текущий масштаб и смещение
-        // Для этого нужно вычислить, какая точка холста находится под мышью.
-        // Учитываем, что canvas позиционирован с учетом canvasCenterX и offsetX
+
         const canvasLeft = canvasCenterX + offsetX;
         const canvasTop = canvasCenterY + offsetY;
         const worldX = (mouseX - canvasLeft) / oldScale;
         const worldY = (mouseY - canvasTop) / oldScale;
-        
-        // Меняем масштаб
+
         scale = newScale;
-        
-        // Пересчитываем смещение так, чтобы мировая точка (worldX, worldY) осталась под мышью
+
         const newCanvasLeft = mouseX - worldX * scale;
         const newCanvasTop = mouseY - worldY * scale;
-        
         offsetX = newCanvasLeft - canvasCenterX;
         offsetY = newCanvasTop - canvasCenterY;
-        
+
         clampAndCenter();
     }
-    
+
     function resetView() {
         scale = 1;
         offsetX = 0;
         offsetY = 0;
         clampAndCenter();
     }
-    
-    // ========== ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ПОД КУРСОРОМ ==========
+
     function getPixelIndexFromClick(clientX, clientY) {
         if (!canvas) return -1;
-        const canvasRect = canvas.getBoundingClientRect();
-        const relX = clientX - canvasRect.left;
-        const relY = clientY - canvasRect.top;
-        if (relX < 0 || relY < 0 || relX > canvasRect.width || relY > canvasRect.height) return -1;
-        
+        const rect = canvas.getBoundingClientRect();
+        const relX = clientX - rect.left;
+        const relY = clientY - rect.top;
+        if (relX < 0 || relY < 0 || relX > rect.width || relY > rect.height) return -1;
         const canvasX = relX / scale;
         const canvasY = relY / scale;
         const col = Math.floor(canvasX / PIXEL_SIZE);
         const row = Math.floor(canvasY / PIXEL_SIZE);
-        if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) {
-            return row * MAP_WIDTH + col;
-        }
+        if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) return row * MAP_WIDTH + col;
         return -1;
     }
-    
-    // ========== ЗВУК ==========
+
+    // ========== ЗВУК, КУЛДАУН ==========
     function playCooldownEndSound() {
         try {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -663,15 +620,14 @@
             osc.stop(now + 0.35);
         } catch(e) { }
     }
-    
-    // ========== КУЛДАУН ==========
+
     function isOnCooldown(username) {
         if (!username) return true;
         const last = userCooldowns.get(username);
         if (!last) return false;
         return (Date.now() - last) < COOLDOWN_SECONDS * 1000;
     }
-    
+
     function getRemainingSeconds(username) {
         if (!username) return 0;
         const last = userCooldowns.get(username);
@@ -680,7 +636,7 @@
         if (elapsed >= COOLDOWN_SECONDS) return 0;
         return Math.ceil(COOLDOWN_SECONDS - elapsed);
     }
-    
+
     function updateCooldownUI() {
         if (!currentUser) {
             if (cooldownSpan) cooldownSpan.innerText = "войдите";
@@ -689,7 +645,6 @@
         const remain = getRemainingSeconds(currentUser.username);
         const wasReady = (lastCooldownState === 0);
         const isReadyNow = (remain === 0);
-        
         if (isReadyNow) {
             cooldownSpan.innerHTML = "✅ ГОТОВ";
             if (!wasReady && currentUser) {
@@ -702,12 +657,12 @@
             lastCooldownState = 1;
         }
     }
-    
+
     function startCooldownTimerLoop() {
         if (cooldownInterval) clearInterval(cooldownInterval);
         cooldownInterval = setInterval(updateCooldownUI, 200);
     }
-    
+
     // ========== УСТАНОВКА ПИКСЕЛЯ ==========
     function placePixel(index, colorHex, username) {
         if (!currentUser || currentUser.username !== username) {
@@ -720,24 +675,24 @@
             return false;
         }
         if (index < 0 || index >= pixelMap.length) return false;
-        
+
         const row = Math.floor(index / MAP_WIDTH);
         const col = index % MAP_WIDTH;
-        
+
         pixelMap[index] = colorHex;
         userCooldowns.set(username, Date.now());
         totalPlaced++;
-        
+
         drawCanvas();
         updateStats();
         updateCooldownUI();
-        saveMapToLocal();
+        saveMapToFirebase();
         updatePlayerPresence();
-        
+
         showMessage(`🎨 ${username} поставил пиксель (${row},${col})!`, 800);
         return true;
     }
-    
+
     function onCanvasClick(e) {
         if (!currentUser) {
             showMessage("🔐 Сначала войди", 1200);
@@ -748,7 +703,7 @@
             placePixel(idx, selectedColor, currentUser.username);
         }
     }
-    
+
     // ========== АВТЕНТИФИКАЦИЯ ==========
     function showNicknameModal() {
         const modal = document.createElement('div');
@@ -761,50 +716,40 @@
             </div>
         `;
         document.body.appendChild(modal);
-        
         const input = modal.querySelector('#nicknameInput');
         const confirmBtn = modal.querySelector('#confirmAuthBtn');
         input.focus();
-        
+
         const doAuth = () => {
             let nickname = input.value.trim();
             if (!nickname) nickname = "Гость_" + Math.floor(Math.random() * 1000);
-            
             currentUser = {
                 username: nickname,
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`,
             };
-            
-            localStorage.setItem("hubattle_username", nickname);
-            updatePlayerPresence();
             updateAuthUI();
             showMessage(`✨ Добро пожаловать, ${nickname}!`, 2000);
             updateCooldownUI();
             startCooldownTimerLoop();
-            updatePlayersUI();
+            updatePlayerPresence();
             modal.remove();
         };
-        
         confirmBtn.addEventListener('click', doAuth);
         input.addEventListener('keypress', (e) => { if (e.key === 'Enter') doAuth(); });
     }
-    
+
     function logout() {
         if (currentUser) {
-            const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
-            delete players[currentUser.username];
-            localStorage.setItem("hubattle_players", JSON.stringify(players));
+            playersRef.child(currentUser.username).remove();
         }
         currentUser = null;
-        localStorage.removeItem("hubattle_username");
         updateAuthUI();
         if (cooldownInterval) clearInterval(cooldownInterval);
         cooldownInterval = null;
         if (cooldownSpan) cooldownSpan.innerText = "войдите";
         showMessage("👋 Вы вышли", 1000);
-        updatePlayersUI();
     }
-    
+
     function updateAuthUI() {
         const widget = document.getElementById("authWidget");
         if (!widget) return;
@@ -822,11 +767,11 @@
             document.getElementById("logoutBtn")?.addEventListener("click", logout);
         }
     }
-    
+
     function escapeHtml(str) { return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
     function updateStats() { if (totalPixelsSpan) totalPixelsSpan.innerText = totalPlaced; }
     function showMessage(msg, duration) { if (!messageDiv) return; messageDiv.innerHTML = `💬 ${msg}`; setTimeout(() => { if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | зум под курсор | битва за Ху Гарден`; }, duration); }
-    
+
     function buildPalette() {
         if (!colorPaletteDiv) return;
         colorPaletteDiv.innerHTML = "";
@@ -845,10 +790,9 @@
         });
         if (previewColorDiv) previewColorDiv.style.backgroundColor = selectedColor;
     }
-    
+
     function setupPanAndZoom() {
         if (!container) return;
-        
         container.addEventListener("mousedown", (e) => {
             if (e.target === canvas || container.contains(e.target)) {
                 isDragging = true;
@@ -858,38 +802,23 @@
                 e.preventDefault();
             }
         });
-        
         window.addEventListener("mousemove", (e) => {
             if (!isDragging) return;
             offsetX = e.clientX - dragStart.x;
             offsetY = e.clientY - dragStart.y;
             clampAndCenter();
         });
-        
         window.addEventListener("mouseup", () => {
             isDragging = false;
             container.style.cursor = "crosshair";
         });
-        
         container.addEventListener("wheel", (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
             zoomAtPoint(delta, e.clientX, e.clientY);
         });
     }
-    
-    // ========== HEARTBEAT И СИНХРОНИЗАЦИЯ ==========
-    function startHeartbeat() {
-        if (heartbeatInterval) clearInterval(heartbeatInterval);
-        heartbeatInterval = setInterval(() => {
-            if (currentUser) {
-                updatePlayerPresence();
-            }
-            cleanOldPlayers();
-            syncCanvasFromStorage();
-        }, 2000);
-    }
-    
+
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
     function init() {
         canvas = document.getElementById("battleCanvas");
@@ -902,101 +831,43 @@
         playersCountSpan = document.getElementById("playersCount");
         messageDiv = document.getElementById("globalMessage");
         playersPanel = document.getElementById("playersPanel");
-        
-        loadMapFromLocal();
+
+        initMap();
+        loadMapFromFirebase();
+        listenForChanges();
+        listenForPlayers();
+
         drawCanvas();
         buildPalette();
         setupPanAndZoom();
-        
+
         canvas.addEventListener("click", onCanvasClick);
-        
+
         document.getElementById("zoomInBtn")?.addEventListener("click", () => zoomAtPoint(0.2, container.clientWidth/2, container.clientHeight/2));
         document.getElementById("zoomOutBtn")?.addEventListener("click", () => zoomAtPoint(-0.2, container.clientWidth/2, container.clientHeight/2));
         document.getElementById("resetViewBtn")?.addEventListener("click", resetView);
-        
         document.getElementById("resetBoardBtn")?.addEventListener("click", () => {
             if (confirm("Сбросить всё поле? Все пиксели станут белыми!")) {
                 initMap();
                 totalPlaced = 0;
-                saveMapToLocal();
+                saveMapToFirebase();
                 drawCanvas();
                 updateStats();
                 showMessage("Поле очищено!", 1500);
             }
         });
-        
-        // Восстанавливаем сессию
-        const savedUsername = localStorage.getItem("hubattle_username");
-        if (savedUsername && !currentUser) {
-            currentUser = {
-                username: savedUsername,
-                avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(savedUsername.slice(0,2))}`,
-            };
-            updateAuthUI();
-            startCooldownTimerLoop();
-            updatePlayerPresence();
-        }
-        
+
         updateAuthUI();
-        if (currentUser) startCooldownTimerLoop();
-        
-        startHeartbeat();
-        
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'hubattle_map' || e.key === 'hubattle_total') {
-                syncCanvasFromStorage();
-            }
-            if (e.key === 'hubattle_players') {
-                updatePlayersUI();
-            }
-        });
-        
-        window.addEventListener('resize', () => {
-            setTimeout(() => clampAndCenter(), 100);
-        });
-        
+
+        window.addEventListener('resize', () => setTimeout(() => clampAndCenter(), 100));
         document.body.addEventListener("click", () => {
             if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
         }, { once: true });
-        
+
         setTimeout(() => clampAndCenter(), 100);
-        updatePlayersUI();
     }
-    
-    window.addEventListener('beforeunload', () => {
-        if (currentUser) {
-            const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
-            delete players[currentUser.username];
-            localStorage.setItem("hubattle_players", JSON.stringify(players));
-        }
-    });
-    
+
     init();
-</script>
-    <!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-
-<script>
-  const firebaseConfig = {
-  apiKey: "AIzaSyCFWI0QOG02IW1Pqdo6xd6uiTN0stjWV3Q",
-  authDomain: "hubattle.firebaseapp.com",
-  databaseURL: "https://hubattle-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "hubattle",
-  storageBucket: "hubattle.firebasestorage.app",
-  messagingSenderId: "746603857511",
-  appId: "1:746603857511:web:edf112bab36a5c9aa376c2",
-  measurementId: "G-GGQ14FW7LF"
-};
-
-  // Инициализация Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-
-  // Ссылки на узлы базы данных
-  const mapRef = db.ref('map');       // будет хранить все пиксели
-  const totalRef = db.ref('total');   // общее количество поставленных пикселей
-  const playersRef = db.ref('players'); // игроки онлайн
 </script>
 </body>
 </html>
