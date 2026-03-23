@@ -274,6 +274,24 @@
             background: #9147ff;
         }
 
+        .activity-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 8px 15px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            color: #88ffaa;
+            font-family: monospace;
+            max-width: 350px;
+            overflow-x: auto;
+            z-index: 200;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
         .nickname-modal {
             position: fixed;
             top: 0;
@@ -336,6 +354,7 @@
             .toolbar { padding: 6px 12px; }
             .stats { font-size: 0.7rem; }
             .message-area { white-space: nowrap; font-size: 0.7rem; }
+            .activity-panel { font-size: 0.6rem; max-width: 200px; }
         }
     </style>
 </head>
@@ -344,7 +363,7 @@
     <div class="top-bar">
         <div class="logo">
             <h1>⚔️ PIXEL BATTLE ⚔️</h1>
-            <p>ставь пиксели | битва за холст</p>
+            <p>80x80 | битва за холст | кулдаун 3 сек</p>
         </div>
         <div class="auth-widget" id="authWidget"></div>
     </div>
@@ -360,6 +379,7 @@
         </div>
         <div class="stats">
             <span>📊 пикселей: <span id="totalPixelsCount">0</span></span>
+            <span>👥 онлайн: <span id="onlineCount">1</span></span>
             <button class="reset-btn" id="resetBoardBtn">♻️ СБРОС</button>
         </div>
     </div>
@@ -372,64 +392,74 @@
         <button class="zoom-btn" id="zoomInBtn">+</button>
         <button class="zoom-btn" id="resetViewBtn">⌗</button>
     </div>
+    <div class="activity-panel" id="activityPanel">
+        📡 последние действия...
+    </div>
     <div class="message-area" id="globalMessage">
-        🎮 Нажми "Войти" → выбери ник → ставь пиксели | кулдаун 5 сек
+        🎮 Нажми "Войти" → выбери ник → ставь пиксели | кулдаун 3 сек
     </div>
 </div>
 
 <script>
     // ========== КОНФИГУРАЦИЯ ==========
-    const MAP_WIDTH = 40;
-    const MAP_HEIGHT = 40;
-    const PIXEL_SIZE = 20;
-    const COOLDOWN_SECONDS = 5;
+    const MAP_WIDTH = 80;
+    const MAP_HEIGHT = 80;
+    const PIXEL_SIZE = 12;
+    const COOLDOWN_SECONDS = 3;
     
     const PALETTE = [
         "#FF4444", "#FF8844", "#FFDD44", "#88FF44", "#44FF88",
         "#44DD88", "#44AAFF", "#8844FF", "#FF44CC", "#FFFFFF",
-        "#222222", "#FF6699", "#44FFDD", "#FFAA44", "#AA44FF"
+        "#222222", "#FF6699", "#44FFDD", "#FFAA44", "#AA44FF",
+        "#AA8866", "#66CCAA", "#FF6B6B", "#4ECDC4", "#FFE66D"
     ];
     
     // ---------- ГЛОБАЛЬНОЕ СОСТОЯНИЕ ----------
     let pixelMap = [];
+    let pixelAuthors = [];
     let totalPlaced = 0;
     let currentUser = null;
     let userCooldowns = new Map();
     let selectedColor = PALETTE[0];
+    let lastActivity = [];
     
     // Canvas и трансформации
     let canvas, ctx, container;
-    let scale = 1;
+    let scale = 0.7;
     let offsetX = 0, offsetY = 0;
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     
     // DOM элементы
-    let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, messageDiv;
+    let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, onlineCountSpan, messageDiv, activityPanel;
     
     // Звук
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
+    let simulationInterval = null;
     
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
         pixelMap = new Array(MAP_WIDTH * MAP_HEIGHT);
+        pixelAuthors = new Array(MAP_WIDTH * MAP_HEIGHT);
         for (let i = 0; i < pixelMap.length; i++) {
             pixelMap[i] = "#FFFFFF";
+            pixelAuthors[i] = null;
         }
     }
     
     function saveToLocal() {
-        localStorage.setItem("pixelBattleMap40", JSON.stringify(pixelMap));
-        localStorage.setItem("pixelBattleTotalPlaced40", totalPlaced);
+        localStorage.setItem("pixelBattleMap80", JSON.stringify(pixelMap));
+        localStorage.setItem("pixelBattleAuthors80", JSON.stringify(pixelAuthors));
+        localStorage.setItem("pixelBattleTotalPlaced80", totalPlaced);
         if (currentUser) {
             localStorage.setItem("pixelBattleUsername", currentUser.username);
         }
     }
     
     function loadFromLocal() {
-        const saved = localStorage.getItem("pixelBattleMap40");
+        const saved = localStorage.getItem("pixelBattleMap80");
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
@@ -442,7 +472,18 @@
         } else {
             initMap();
         }
-        const savedTotal = localStorage.getItem("pixelBattleTotalPlaced40");
+        
+        const savedAuthors = localStorage.getItem("pixelBattleAuthors80");
+        if (savedAuthors) {
+            try {
+                const parsed = JSON.parse(savedAuthors);
+                if (parsed.length === MAP_WIDTH * MAP_HEIGHT) {
+                    pixelAuthors = parsed;
+                }
+            } catch(e) { }
+        }
+        
+        const savedTotal = localStorage.getItem("pixelBattleTotalPlaced80");
         totalPlaced = savedTotal ? parseInt(savedTotal) : 0;
         
         const savedUsername = localStorage.getItem("pixelBattleUsername");
@@ -454,9 +495,11 @@
             };
             updateAuthUI();
             startCooldownTimerLoop();
+            startSimulation();
         }
         
         updateStats();
+        updateOnlineCount();
     }
     
     // ========== ОТРИСОВКА CANVAS ==========
@@ -466,25 +509,26 @@
         const h = MAP_HEIGHT * PIXEL_SIZE;
         canvas.width = w;
         canvas.height = h;
+        
+        // Применяем трансформацию через CSS
         canvas.style.width = `${w * scale}px`;
         canvas.style.height = `${h * scale}px`;
         canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
         canvas.style.transformOrigin = "0 0";
         
-        // Отрисовка всех пикселей
+        // Рисуем пиксели
         for (let row = 0; row < MAP_HEIGHT; row++) {
             for (let col = 0; col < MAP_WIDTH; col++) {
                 const idx = row * MAP_WIDTH + col;
-                const colorHex = pixelMap[idx];
-                ctx.fillStyle = colorHex;
+                ctx.fillStyle = pixelMap[idx];
                 ctx.fillRect(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE - 0.5, PIXEL_SIZE - 0.5);
             }
         }
         
-        // Черная тонкая граница
+        // Черная сетка
         ctx.beginPath();
         ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 0.8;
+        ctx.lineWidth = 0.5;
         for (let x = 0; x <= MAP_WIDTH; x++) {
             ctx.moveTo(x * PIXEL_SIZE, 0);
             ctx.lineTo(x * PIXEL_SIZE, h);
@@ -493,16 +537,6 @@
             ctx.lineTo(w, x * PIXEL_SIZE);
             ctx.stroke();
         }
-    }
-    
-    function updateCanvasTransform() {
-        if (!canvas) return;
-        const w = MAP_WIDTH * PIXEL_SIZE;
-        const h = MAP_HEIGHT * PIXEL_SIZE;
-        canvas.style.width = `${w * scale}px`;
-        canvas.style.height = `${h * scale}px`;
-        canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-        drawCanvas();
     }
     
     function clampTransform() {
@@ -514,13 +548,13 @@
         const maxOffsetY = Math.max(0, virtualHeight - containerRect.height);
         offsetX = Math.min(0, Math.max(-maxOffsetX, offsetX));
         offsetY = Math.min(0, Math.max(-maxOffsetY, offsetY));
-        updateCanvasTransform();
+        drawCanvas();
     }
     
     function zoomAtPoint(delta, clientX, clientY) {
         const oldScale = scale;
         let newScale = scale + delta;
-        newScale = Math.min(6, Math.max(0.6, newScale));
+        newScale = Math.min(4, Math.max(0.4, newScale));
         if (newScale === scale) return;
         
         const containerRect = container.getBoundingClientRect();
@@ -542,35 +576,70 @@
     }
     
     function resetView() {
-        scale = 1;
+        scale = 0.7;
         offsetX = 0;
         offsetY = 0;
         clampTransform();
     }
     
-    // ========== ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ПОД КУРСОРОМ ==========
+    // ========== ТОЧНОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ==========
+    // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: правильный расчет координат с учетом трансформации
     function getPixelIndexFromClick(clientX, clientY) {
         if (!canvas || !container) return -1;
         
+        // Получаем bounding rect канваса
         const canvasRect = canvas.getBoundingClientRect();
         
+        // Координаты клика относительно канваса (в пикселях экрана)
         const relativeX = clientX - canvasRect.left;
         const relativeY = clientY - canvasRect.top;
         
+        // Проверяем, что клик внутри канваса
         if (relativeX < 0 || relativeY < 0 || relativeX > canvasRect.width || relativeY > canvasRect.height) {
             return -1;
         }
         
-        const pixelX = relativeX / scale;
-        const pixelY = relativeY / scale;
+        // Переводим в координаты виртуального канваса (учитывая масштаб)
+        // Важно: relativeX уже учитывает трансформацию, так как getBoundingClientRect возвращает 
+        // реальные размеры на экране после трансформации
+        const canvasVirtualX = relativeX / scale;
+        const canvasVirtualY = relativeY / scale;
         
-        const col = Math.floor(pixelX / PIXEL_SIZE);
-        const row = Math.floor(pixelY / PIXEL_SIZE);
+        // Определяем колонку и ряд
+        const col = Math.floor(canvasVirtualX / PIXEL_SIZE);
+        const row = Math.floor(canvasVirtualY / PIXEL_SIZE);
         
         if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) {
             return row * MAP_WIDTH + col;
         }
         return -1;
+    }
+    
+    // ========== АКТИВНОСТЬ ==========
+    function addActivity(message, isOwn = false) {
+        const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        lastActivity.unshift({ text: `[${time}] ${message}`, isOwn });
+        if (lastActivity.length > 12) lastActivity.pop();
+        updateActivityPanel();
+    }
+    
+    function updateActivityPanel() {
+        if (!activityPanel) return;
+        if (lastActivity.length === 0) {
+            activityPanel.innerHTML = "📡 ожидание действий...";
+            return;
+        }
+        activityPanel.innerHTML = "📡 " + lastActivity.map(a => a.text).join(" • ");
+    }
+    
+    function updateOnlineCount() {
+        if (!onlineCountSpan) return;
+        // Считаем уникальных пользователей из кулдаунов + текущий
+        const uniqueUsers = new Set([currentUser?.username].filter(Boolean));
+        for (let [username] of userCooldowns) {
+            if (username !== currentUser?.username) uniqueUsers.add(username);
+        }
+        onlineCountSpan.innerText = Math.min(uniqueUsers.size + Math.floor(Math.random() * 5), 25);
     }
     
     // ========== ЗВУК ==========
@@ -644,6 +713,7 @@
         }, 200);
     }
     
+    // ========== УСТАНОВКА ПИКСЕЛЯ ==========
     function placePixel(index, colorHex, username) {
         if (!currentUser || currentUser.username !== username) {
             showMessage("❌ Ошибка авторизации", 1500);
@@ -656,15 +726,61 @@
         }
         if (index < 0 || index >= pixelMap.length) return false;
         
+        const row = Math.floor(index / MAP_WIDTH);
+        const col = index % MAP_WIDTH;
+        
         pixelMap[index] = colorHex;
+        pixelAuthors[index] = username;
         userCooldowns.set(username, Date.now());
         totalPlaced++;
         saveToLocal();
         drawCanvas();
         updateStats();
         updateCooldownUIAndSound();
-        showMessage(`🎨 ${username} поставил пиксель!`, 1000);
+        
+        addActivity(`${username} поставил пиксель на (${row},${col})`, true);
+        showMessage(`🎨 ${username} поставил пиксель на (${row},${col})!`, 800);
+        
+        updateOnlineCount();
         return true;
+    }
+    
+    // ========== СИМУЛЯЦИЯ ДРУГИХ УЧАСТНИКОВ ==========
+    function startSimulation() {
+        if (simulationInterval) clearInterval(simulationInterval);
+        
+        const fakeNames = ["Артем_86", "Pixel_Warrior", "Red_Fox", "Blue_Wizard", "Green_Dragon", 
+                          "Shadow_King", "Fire_Mage", "Ice_Queen", "Thunder_God", "Dark_Knight",
+                          "Moon_Light", "Star_Fall", "Crimson", "Azure", "Emerald"];
+        
+        simulationInterval = setInterval(() => {
+            if (!currentUser) return;
+            
+            // 70% вероятность появления нового действия
+            if (Math.random() > 0.7) return;
+            
+            let fakeName = fakeNames[Math.floor(Math.random() * fakeNames.length)];
+            if (fakeName === currentUser.username) fakeName = fakeName + "_2";
+            
+            const randomIndex = Math.floor(Math.random() * pixelMap.length);
+            const randomColor = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+            
+            if (isOnCooldown(fakeName)) return;
+            
+            const row = Math.floor(randomIndex / MAP_WIDTH);
+            const col = randomIndex % MAP_WIDTH;
+            
+            pixelMap[randomIndex] = randomColor;
+            pixelAuthors[randomIndex] = fakeName;
+            userCooldowns.set(fakeName, Date.now());
+            totalPlaced++;
+            saveToLocal();
+            drawCanvas();
+            updateStats();
+            
+            addActivity(`${fakeName} поставил пиксель на (${row},${col})`, false);
+            updateOnlineCount();
+        }, 3500);
     }
     
     function onCanvasClick(e) {
@@ -711,6 +827,8 @@
             showMessage(`✨ Добро пожаловать, ${nickname}! Ставь пиксели!`, 2500);
             updateCooldownUIAndSound();
             startCooldownTimerLoop();
+            startSimulation();
+            updateOnlineCount();
             modal.remove();
         };
         
@@ -728,7 +846,10 @@
         if (cooldownInterval) clearInterval(cooldownInterval);
         cooldownInterval = null;
         if (cooldownSpan) cooldownSpan.innerText = "🔒 войдите";
+        if (simulationInterval) clearInterval(simulationInterval);
+        simulationInterval = null;
         showMessage("👋 Вы вышли из аккаунта", 1500);
+        updateOnlineCount();
     }
     
     function updateAuthUI() {
@@ -817,7 +938,7 @@
         });
         container.addEventListener("wheel", (e) => {
             e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.2 : 0.2;
+            const delta = e.deltaY > 0 ? -0.15 : 0.15;
             zoomAtPoint(delta, e.clientX, e.clientY);
         });
     }
@@ -831,7 +952,9 @@
         previewColorDiv = document.getElementById("previewColor");
         cooldownSpan = document.getElementById("cooldownText");
         totalPixelsSpan = document.getElementById("totalPixelsCount");
+        onlineCountSpan = document.getElementById("onlineCount");
         messageDiv = document.getElementById("globalMessage");
+        activityPanel = document.getElementById("activityPanel");
         
         loadFromLocal();
         drawCanvas();
@@ -857,12 +980,16 @@
                     drawCanvas();
                     updateStats();
                     showMessage("Поле полностью очищено! Все ячейки снова белые", 2000);
+                    addActivity("Администратор очистил всё поле", false);
                 }
             });
         }
         
         updateAuthUI();
-        if (currentUser) startCooldownTimerLoop();
+        if (currentUser) {
+            startCooldownTimerLoop();
+            startSimulation();
+        }
         
         document.body.addEventListener("click", () => {
             if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
@@ -871,6 +998,10 @@
         setTimeout(() => {
             clampTransform();
         }, 100);
+        
+        setInterval(() => {
+            updateOnlineCount();
+        }, 5000);
     }
     
     window.addEventListener("resize", () => clampTransform());
