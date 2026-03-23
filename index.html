@@ -376,7 +376,7 @@
     const MAP_HEIGHT = 60;
     const PIXEL_SIZE = 12;
     const COOLDOWN_SECONDS = 3;
-    const HEARTBEAT_INTERVAL = 5000;   // обновление присутствия каждые 5 сек
+    const HEARTBEAT_INTERVAL = 5000;
 
     const PALETTE = [
         "#FF4444", "#FF8844", "#FFDD44", "#88FF44", "#44FF88",
@@ -460,7 +460,7 @@
         });
     }
 
-    // ========== ИГРОКИ ОНЛАЙН (С HEARTBEAT) ==========
+    // ========== ИГРОКИ ОНЛАЙН ==========
     function updatePlayerPresence() {
         if (!currentUser) return;
         playersRef.child(currentUser.username).set({ lastSeen: Date.now(), avatar: currentUser.avatar });
@@ -470,9 +470,7 @@
     function startHeartbeat() {
         if (heartbeatInterval) clearInterval(heartbeatInterval);
         heartbeatInterval = setInterval(() => {
-            if (currentUser) {
-                updatePlayerPresence();
-            }
+            if (currentUser) updatePlayerPresence();
         }, HEARTBEAT_INTERVAL);
     }
 
@@ -515,7 +513,6 @@
                 ctx.fillRect(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE - 0.5, PIXEL_SIZE - 0.5);
             }
         }
-        // Нейтральная сетка (светло-серая)
         if (scale > 1.2) {
             ctx.beginPath();
             ctx.strokeStyle = "#cccccc";
@@ -564,31 +561,24 @@
         newScale = Math.min(5, Math.max(0.5, newScale));
         if (newScale === scale) return;
 
-        // Текущее положение canvas на экране
         const canvasRect = canvas.getBoundingClientRect();
-        // Координаты мыши относительно canvas (в пикселях экрана)
         const mouseCanvasX = clientX - canvasRect.left;
         const mouseCanvasY = clientY - canvasRect.top;
 
         if (mouseCanvasX < 0 || mouseCanvasY < 0 || mouseCanvasX > canvasRect.width || mouseCanvasY > canvasRect.height) {
-            // Если мышь вне canvas — зум относительно центра
             scale = newScale;
             clampAndCenter();
             return;
         }
 
-        // Мировые координаты точки под курсором (до изменения масштаба)
         const worldX = mouseCanvasX / oldScale;
         const worldY = mouseCanvasY / oldScale;
 
-        // Меняем масштаб
         scale = newScale;
 
-        // После изменения масштаба точка должна остаться под мышью
         const newMouseCanvasX = worldX * scale;
         const newMouseCanvasY = worldY * scale;
 
-        // Корректируем смещение так, чтобы точка не сдвинулась
         offsetX += (mouseCanvasX - newMouseCanvasX) / scale;
         offsetY += (mouseCanvasY - newMouseCanvasY) / scale;
 
@@ -810,27 +800,37 @@
         if (previewColorDiv) previewColorDiv.style.backgroundColor = selectedColor;
     }
 
+    // ========== ПАННОРАМИРОВАНИЕ ЛЕВОЙ И СРЕДНЕЙ КНОПКОЙ ==========
     function setupPanAndZoom() {
         if (!container) return;
-        container.addEventListener("mousedown", (e) => {
-            if (e.target === canvas || container.contains(e.target)) {
+
+        const onMouseDown = (e) => {
+            // Левая (0) или средняя (1) кнопка мыши
+            if (e.button === 0 || e.button === 1) {
                 isDragging = true;
                 dragStart.x = e.clientX - offsetX;
                 dragStart.y = e.clientY - offsetY;
                 container.style.cursor = "grabbing";
                 e.preventDefault();
             }
-        });
-        window.addEventListener("mousemove", (e) => {
+        };
+
+        const onMouseMove = (e) => {
             if (!isDragging) return;
             offsetX = e.clientX - dragStart.x;
             offsetY = e.clientY - dragStart.y;
             clampAndCenter();
-        });
-        window.addEventListener("mouseup", () => {
+        };
+
+        const onMouseUp = () => {
             isDragging = false;
             container.style.cursor = "crosshair";
-        });
+        };
+
+        container.addEventListener("mousedown", onMouseDown);
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+
         container.addEventListener("wheel", (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
