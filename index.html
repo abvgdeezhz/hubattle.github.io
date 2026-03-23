@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Pixel Battle — Битва пикселей</title>
+    <title>HuBattle — Битва пикселей</title>
     <style>
         * {
             margin: 0;
@@ -13,7 +13,7 @@
         }
 
         body {
-            background: #1a1f2e;
+            background: #0a0c14;
             font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
             overflow: hidden;
             height: 100vh;
@@ -25,13 +25,13 @@
             flex-direction: column;
             height: 100vh;
             width: 100%;
-            background: #0f1219;
+            background: #0a0c14;
         }
 
         .top-bar {
-            background: rgba(15, 18, 25, 0.98);
+            background: rgba(10, 14, 24, 0.98);
             backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 107, 107, 0.3);
             padding: 8px 20px;
             display: flex;
             justify-content: space-between;
@@ -43,8 +43,8 @@
         }
 
         .logo h1 {
-            font-size: 1.4rem;
-            background: linear-gradient(135deg, #ffffff, #b0b0ff);
+            font-size: 1.6rem;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
@@ -53,12 +53,12 @@
 
         .logo p {
             font-size: 0.7rem;
-            color: #ffffff;
-            opacity: 0.7;
+            color: #ffaa88;
+            opacity: 0.9;
         }
 
         .auth-widget {
-            background: #2a2f3e;
+            background: #1e1f2e;
             padding: 5px 16px;
             border-radius: 60px;
             display: flex;
@@ -76,7 +76,7 @@
             width: 34px;
             height: 34px;
             border-radius: 50%;
-            border: 2px solid #9147ff;
+            border: 2px solid #ff6b6b;
             object-fit: cover;
             background: #2d2f3a;
         }
@@ -106,7 +106,7 @@
         }
 
         .login-btn {
-            background: #9147ff;
+            background: #ff6b6b;
             color: white;
             font-weight: bold;
             display: flex;
@@ -115,7 +115,7 @@
         }
 
         .login-btn:hover {
-            background: #a970ff;
+            background: #ff8e53;
             transform: scale(0.97);
         }
 
@@ -128,30 +128,31 @@
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 107, 107, 0.2);
             flex-shrink: 0;
         }
 
         .palette {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
+            max-width: 500px;
         }
 
         .color-option {
-            width: 38px;
-            height: 38px;
-            border-radius: 12px;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.1s ease;
             border: 2px solid transparent;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
 
         .color-option.active {
-            transform: scale(1.08);
-            border: 3px solid white;
-            box-shadow: 0 0 0 2px #9147ff;
+            transform: scale(1.1);
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px #ff6b6b;
         }
 
         .selected-info {
@@ -170,12 +171,12 @@
         .preview-color {
             width: 32px;
             height: 32px;
-            border-radius: 10px;
+            border-radius: 8px;
             border: 1px solid white;
         }
 
         .cooldown-indicator {
-            background: #2a2f3e;
+            background: #1e1f2e;
             padding: 5px 16px;
             border-radius: 40px;
             font-family: monospace;
@@ -188,7 +189,7 @@
         }
 
         .reset-btn {
-            background: #2a2f3e;
+            background: #2a2f42;
             border: none;
             padding: 5px 14px;
             border-radius: 30px;
@@ -212,7 +213,7 @@
             flex: 1;
             position: relative;
             overflow: hidden;
-            background: #0a0c12;
+            background: #05070c;
             cursor: grab;
         }
 
@@ -244,7 +245,7 @@
             z-index: 200;
             white-space: nowrap;
             font-weight: 500;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 107, 107, 0.3);
         }
 
         .zoom-controls {
@@ -257,7 +258,7 @@
         }
 
         .zoom-btn {
-            background: #2a2f3e;
+            background: #1e1f2e;
             border: none;
             width: 40px;
             height: 40px;
@@ -271,10 +272,10 @@
         }
 
         .zoom-btn:hover {
-            background: #9147ff;
+            background: #ff6b6b;
         }
 
-        .activity-panel {
+        .players-panel {
             position: fixed;
             bottom: 20px;
             left: 20px;
@@ -283,13 +284,13 @@
             padding: 8px 15px;
             border-radius: 30px;
             font-size: 0.7rem;
-            color: #88ffaa;
+            color: #ffaa88;
             font-family: monospace;
-            max-width: 350px;
-            overflow-x: auto;
+            max-width: 300px;
             z-index: 200;
             pointer-events: none;
             white-space: nowrap;
+            overflow-x: auto;
         }
 
         .nickname-modal {
@@ -312,7 +313,7 @@
             padding: 30px;
             width: 340px;
             text-align: center;
-            border: 1px solid #9147ff;
+            border: 1px solid #ff6b6b;
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
 
@@ -339,7 +340,7 @@
         }
 
         .modal-content button {
-            background: #9147ff;
+            background: #ff6b6b;
             border: none;
             padding: 10px 24px;
             border-radius: 60px;
@@ -350,11 +351,11 @@
         }
 
         @media (max-width: 800px) {
-            .color-option { width: 30px; height: 30px; }
+            .color-option { width: 28px; height: 28px; }
             .toolbar { padding: 6px 12px; }
             .stats { font-size: 0.7rem; }
             .message-area { white-space: nowrap; font-size: 0.7rem; }
-            .activity-panel { font-size: 0.6rem; max-width: 200px; }
+            .players-panel { font-size: 0.6rem; max-width: 180px; }
         }
     </style>
 </head>
@@ -362,8 +363,8 @@
 <div class="battle-fullscreen">
     <div class="top-bar">
         <div class="logo">
-            <h1>⚔️ PIXEL BATTLE ⚔️</h1>
-            <p>80x80 | битва за холст | кулдаун 3 сек</p>
+            <h1>🔥 HUBATTLE 🔥</h1>
+            <p>1920x1080 | битва за холст | кулдаун 3 сек</p>
         </div>
         <div class="auth-widget" id="authWidget"></div>
     </div>
@@ -379,7 +380,7 @@
         </div>
         <div class="stats">
             <span>📊 пикселей: <span id="totalPixelsCount">0</span></span>
-            <span>👥 онлайн: <span id="onlineCount">1</span></span>
+            <span>👥 игроков: <span id="playersCount">1</span></span>
             <button class="reset-btn" id="resetBoardBtn">♻️ СБРОС</button>
         </div>
     </div>
@@ -392,8 +393,8 @@
         <button class="zoom-btn" id="zoomInBtn">+</button>
         <button class="zoom-btn" id="resetViewBtn">⌗</button>
     </div>
-    <div class="activity-panel" id="activityPanel">
-        📡 последние действия...
+    <div class="players-panel" id="playersPanel">
+        👥 активные игроки: ...
     </div>
     <div class="message-area" id="globalMessage">
         🎮 Нажми "Войти" → выбери ник → ставь пиксели | кулдаун 3 сек
@@ -402,16 +403,21 @@
 
 <script>
     // ========== КОНФИГУРАЦИЯ ==========
-    const MAP_WIDTH = 80;
-    const MAP_HEIGHT = 80;
-    const PIXEL_SIZE = 12;
+    // ХОЛСТ 1920x1080 (соотношение 16:9)
+    const MAP_WIDTH = 192;
+    const MAP_HEIGHT = 108;
+    const PIXEL_SIZE = 10;  // 192*10=1920, 108*10=1080
     const COOLDOWN_SECONDS = 3;
     
+    // РАСШИРЕННАЯ ПАЛИТРА (32 цвета)
     const PALETTE = [
         "#FF4444", "#FF8844", "#FFDD44", "#88FF44", "#44FF88",
-        "#44DD88", "#44AAFF", "#8844FF", "#FF44CC", "#FFFFFF",
-        "#222222", "#FF6699", "#44FFDD", "#FFAA44", "#AA44FF",
-        "#AA8866", "#66CCAA", "#FF6B6B", "#4ECDC4", "#FFE66D"
+        "#44FFDD", "#44AAFF", "#8844FF", "#FF44CC", "#FFFFFF",
+        "#222222", "#FF6699", "#44FFAA", "#FFAA44", "#AA44FF",
+        "#FF6B6B", "#4ECDC4", "#FFE66D", "#95E77E", "#FF9F4A",
+        "#C77DFF", "#FF88C0", "#66CC88", "#88AAFF", "#FFB347",
+        "#6A4E9B", "#E86A6A", "#6A9B6A", "#9B6A9B", "#6A8C9B",
+        "#D4AF37", "#CD5C5C", "#6495ED", "#DC143C", "#00FA9A"
     ];
     
     // ---------- ГЛОБАЛЬНОЕ СОСТОЯНИЕ ----------
@@ -419,25 +425,24 @@
     let pixelAuthors = [];
     let totalPlaced = 0;
     let currentUser = null;
-    let userCooldowns = new Map();
+    let userCooldowns = new Map();  // username -> timestamp
+    let activePlayers = new Set();   // реальные игроки на сайте
     let selectedColor = PALETTE[0];
-    let lastActivity = [];
     
     // Canvas и трансформации
     let canvas, ctx, container;
-    let scale = 0.7;
+    let scale = 0.45;  // начальный масштаб чтобы видеть почти всё поле
     let offsetX = 0, offsetY = 0;
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     
     // DOM элементы
-    let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, onlineCountSpan, messageDiv, activityPanel;
+    let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, messageDiv, playersPanel;
     
     // Звук
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
-    let simulationInterval = null;
     
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
@@ -450,16 +455,16 @@
     }
     
     function saveToLocal() {
-        localStorage.setItem("pixelBattleMap80", JSON.stringify(pixelMap));
-        localStorage.setItem("pixelBattleAuthors80", JSON.stringify(pixelAuthors));
-        localStorage.setItem("pixelBattleTotalPlaced80", totalPlaced);
+        localStorage.setItem("hubattleMap", JSON.stringify(pixelMap));
+        localStorage.setItem("hubattleAuthors", JSON.stringify(pixelAuthors));
+        localStorage.setItem("hubattleTotalPlaced", totalPlaced);
         if (currentUser) {
-            localStorage.setItem("pixelBattleUsername", currentUser.username);
+            localStorage.setItem("hubattleUsername", currentUser.username);
         }
     }
     
     function loadFromLocal() {
-        const saved = localStorage.getItem("pixelBattleMap80");
+        const saved = localStorage.getItem("hubattleMap");
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
@@ -473,7 +478,7 @@
             initMap();
         }
         
-        const savedAuthors = localStorage.getItem("pixelBattleAuthors80");
+        const savedAuthors = localStorage.getItem("hubattleAuthors");
         if (savedAuthors) {
             try {
                 const parsed = JSON.parse(savedAuthors);
@@ -483,23 +488,23 @@
             } catch(e) { }
         }
         
-        const savedTotal = localStorage.getItem("pixelBattleTotalPlaced80");
+        const savedTotal = localStorage.getItem("hubattleTotalPlaced");
         totalPlaced = savedTotal ? parseInt(savedTotal) : 0;
         
-        const savedUsername = localStorage.getItem("pixelBattleUsername");
+        const savedUsername = localStorage.getItem("hubattleUsername");
         if (savedUsername && !currentUser) {
             currentUser = {
                 username: savedUsername,
-                avatar: `https://ui-avatars.com/api/?background=9147ff&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(savedUsername.slice(0,2))}`,
+                avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(savedUsername.slice(0,2))}`,
                 token: "saved_" + Date.now()
             };
+            activePlayers.add(savedUsername);
             updateAuthUI();
             startCooldownTimerLoop();
-            startSimulation();
         }
         
         updateStats();
-        updateOnlineCount();
+        updatePlayersList();
     }
     
     // ========== ОТРИСОВКА CANVAS ==========
@@ -510,13 +515,12 @@
         canvas.width = w;
         canvas.height = h;
         
-        // Применяем трансформацию через CSS
         canvas.style.width = `${w * scale}px`;
         canvas.style.height = `${h * scale}px`;
         canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
         canvas.style.transformOrigin = "0 0";
         
-        // Рисуем пиксели
+        // Отрисовка пикселей
         for (let row = 0; row < MAP_HEIGHT; row++) {
             for (let col = 0; col < MAP_WIDTH; col++) {
                 const idx = row * MAP_WIDTH + col;
@@ -525,17 +529,19 @@
             }
         }
         
-        // Черная сетка
-        ctx.beginPath();
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 0.5;
-        for (let x = 0; x <= MAP_WIDTH; x++) {
-            ctx.moveTo(x * PIXEL_SIZE, 0);
-            ctx.lineTo(x * PIXEL_SIZE, h);
-            ctx.stroke();
-            ctx.moveTo(0, x * PIXEL_SIZE);
-            ctx.lineTo(w, x * PIXEL_SIZE);
-            ctx.stroke();
+        // Сетка (только при достаточном зуме)
+        if (scale > 1.2) {
+            ctx.beginPath();
+            ctx.strokeStyle = "#cccccc";
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x <= MAP_WIDTH; x++) {
+                ctx.moveTo(x * PIXEL_SIZE, 0);
+                ctx.lineTo(x * PIXEL_SIZE, h);
+                ctx.stroke();
+                ctx.moveTo(0, x * PIXEL_SIZE);
+                ctx.lineTo(w, x * PIXEL_SIZE);
+                ctx.stroke();
+            }
         }
     }
     
@@ -554,7 +560,7 @@
     function zoomAtPoint(delta, clientX, clientY) {
         const oldScale = scale;
         let newScale = scale + delta;
-        newScale = Math.min(4, Math.max(0.4, newScale));
+        newScale = Math.min(3, Math.max(0.3, newScale));
         if (newScale === scale) return;
         
         const containerRect = container.getBoundingClientRect();
@@ -576,38 +582,33 @@
     }
     
     function resetView() {
-        scale = 0.7;
+        scale = 0.45;
         offsetX = 0;
         offsetY = 0;
         clampTransform();
     }
     
-    // ========== ТОЧНОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ==========
-    // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: правильный расчет координат с учетом трансформации
+    // ========== ИСПРАВЛЕННОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ==========
     function getPixelIndexFromClick(clientX, clientY) {
         if (!canvas || !container) return -1;
         
-        // Получаем bounding rect канваса
         const canvasRect = canvas.getBoundingClientRect();
         
-        // Координаты клика относительно канваса (в пикселях экрана)
+        // Координаты относительно canvas (в пикселях экрана)
         const relativeX = clientX - canvasRect.left;
         const relativeY = clientY - canvasRect.top;
         
-        // Проверяем, что клик внутри канваса
         if (relativeX < 0 || relativeY < 0 || relativeX > canvasRect.width || relativeY > canvasRect.height) {
             return -1;
         }
         
-        // Переводим в координаты виртуального канваса (учитывая масштаб)
-        // Важно: relativeX уже учитывает трансформацию, так как getBoundingClientRect возвращает 
-        // реальные размеры на экране после трансформации
-        const canvasVirtualX = relativeX / scale;
-        const canvasVirtualY = relativeY / scale;
+        // Переводим в координаты виртуального canvas (учитываем масштаб и смещение)
+        // Важно: relativeX/relativeY уже в экранных пикселях, делим на scale чтобы получить координаты в мире canvas
+        const canvasX = relativeX / scale;
+        const canvasY = relativeY / scale;
         
-        // Определяем колонку и ряд
-        const col = Math.floor(canvasVirtualX / PIXEL_SIZE);
-        const row = Math.floor(canvasVirtualY / PIXEL_SIZE);
+        const col = Math.floor(canvasX / PIXEL_SIZE);
+        const row = Math.floor(canvasY / PIXEL_SIZE);
         
         if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) {
             return row * MAP_WIDTH + col;
@@ -615,31 +616,44 @@
         return -1;
     }
     
-    // ========== АКТИВНОСТЬ ==========
-    function addActivity(message, isOwn = false) {
-        const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        lastActivity.unshift({ text: `[${time}] ${message}`, isOwn });
-        if (lastActivity.length > 12) lastActivity.pop();
-        updateActivityPanel();
+    // ========== РЕАЛЬНЫЕ ИГРОКИ ==========
+    function updatePlayersList() {
+        if (!playersPanel) return;
+        
+        // Активные игроки - те, у кого есть кулдаун или текущий пользователь
+        const allPlayers = new Set(activePlayers);
+        if (currentUser) allPlayers.add(currentUser.username);
+        
+        // Добавляем игроков из кулдаунов (кто ставил пиксели недавно)
+        for (let [username, timestamp] of userCooldowns) {
+            if (Date.now() - timestamp < 60000) { // активен последнюю минуту
+                allPlayers.add(username);
+            }
+        }
+        
+        const playersList = Array.from(allPlayers).filter(p => p).slice(0, 20);
+        
+        if (playersList.length === 0) {
+            playersPanel.innerHTML = "👥 ожидание игроков...";
+        } else {
+            playersPanel.innerHTML = `👥 активные (${playersList.length}): ${playersList.join(", ")}`;
+        }
+        
+        if (playersCountSpan) playersCountSpan.innerText = playersList.length;
     }
     
-    function updateActivityPanel() {
-        if (!activityPanel) return;
-        if (lastActivity.length === 0) {
-            activityPanel.innerHTML = "📡 ожидание действий...";
-            return;
+    function addRealPlayer(username) {
+        if (username && username !== currentUser?.username) {
+            activePlayers.add(username);
+            setTimeout(() => {
+                // Удаляем через 2 минуты неактивности
+                if (!userCooldowns.has(username) && username !== currentUser?.username) {
+                    activePlayers.delete(username);
+                }
+                updatePlayersList();
+            }, 120000);
         }
-        activityPanel.innerHTML = "📡 " + lastActivity.map(a => a.text).join(" • ");
-    }
-    
-    function updateOnlineCount() {
-        if (!onlineCountSpan) return;
-        // Считаем уникальных пользователей из кулдаунов + текущий
-        const uniqueUsers = new Set([currentUser?.username].filter(Boolean));
-        for (let [username] of userCooldowns) {
-            if (username !== currentUser?.username) uniqueUsers.add(username);
-        }
-        onlineCountSpan.innerText = Math.min(uniqueUsers.size + Math.floor(Math.random() * 5), 25);
+        updatePlayersList();
     }
     
     // ========== ЗВУК ==========
@@ -738,49 +752,10 @@
         updateStats();
         updateCooldownUIAndSound();
         
-        addActivity(`${username} поставил пиксель на (${row},${col})`, true);
         showMessage(`🎨 ${username} поставил пиксель на (${row},${col})!`, 800);
         
-        updateOnlineCount();
+        updatePlayersList();
         return true;
-    }
-    
-    // ========== СИМУЛЯЦИЯ ДРУГИХ УЧАСТНИКОВ ==========
-    function startSimulation() {
-        if (simulationInterval) clearInterval(simulationInterval);
-        
-        const fakeNames = ["Артем_86", "Pixel_Warrior", "Red_Fox", "Blue_Wizard", "Green_Dragon", 
-                          "Shadow_King", "Fire_Mage", "Ice_Queen", "Thunder_God", "Dark_Knight",
-                          "Moon_Light", "Star_Fall", "Crimson", "Azure", "Emerald"];
-        
-        simulationInterval = setInterval(() => {
-            if (!currentUser) return;
-            
-            // 70% вероятность появления нового действия
-            if (Math.random() > 0.7) return;
-            
-            let fakeName = fakeNames[Math.floor(Math.random() * fakeNames.length)];
-            if (fakeName === currentUser.username) fakeName = fakeName + "_2";
-            
-            const randomIndex = Math.floor(Math.random() * pixelMap.length);
-            const randomColor = PALETTE[Math.floor(Math.random() * PALETTE.length)];
-            
-            if (isOnCooldown(fakeName)) return;
-            
-            const row = Math.floor(randomIndex / MAP_WIDTH);
-            const col = randomIndex % MAP_WIDTH;
-            
-            pixelMap[randomIndex] = randomColor;
-            pixelAuthors[randomIndex] = fakeName;
-            userCooldowns.set(fakeName, Date.now());
-            totalPlaced++;
-            saveToLocal();
-            drawCanvas();
-            updateStats();
-            
-            addActivity(`${fakeName} поставил пиксель на (${row},${col})`, false);
-            updateOnlineCount();
-        }, 3500);
     }
     
     function onCanvasClick(e) {
@@ -800,7 +775,7 @@
         modal.className = 'nickname-modal';
         modal.innerHTML = `
             <div class="modal-content">
-                <h3>🎮 Авторизация</h3>
+                <h3>🔥 Вход в HuBattle</h3>
                 <input type="text" id="nicknameInput" placeholder="Введите ваш никнейм" maxlength="20" autocomplete="off">
                 <button id="confirmAuthBtn">⚡ Войти и рисовать</button>
             </div>
@@ -819,16 +794,16 @@
             }
             currentUser = {
                 username: nickname,
-                avatar: `https://ui-avatars.com/api/?background=9147ff&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`,
+                avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`,
                 token: "auth_" + Date.now()
             };
+            activePlayers.add(nickname);
             saveToLocal();
             updateAuthUI();
             showMessage(`✨ Добро пожаловать, ${nickname}! Ставь пиксели!`, 2500);
             updateCooldownUIAndSound();
             startCooldownTimerLoop();
-            startSimulation();
-            updateOnlineCount();
+            updatePlayersList();
             modal.remove();
         };
         
@@ -839,24 +814,25 @@
     }
     
     function logout() {
+        if (currentUser) {
+            activePlayers.delete(currentUser.username);
+        }
         currentUser = null;
-        localStorage.removeItem("pixelBattleUsername");
+        localStorage.removeItem("hubattleUsername");
         updateAuthUI();
         updateStats();
         if (cooldownInterval) clearInterval(cooldownInterval);
         cooldownInterval = null;
         if (cooldownSpan) cooldownSpan.innerText = "🔒 войдите";
-        if (simulationInterval) clearInterval(simulationInterval);
-        simulationInterval = null;
         showMessage("👋 Вы вышли из аккаунта", 1500);
-        updateOnlineCount();
+        updatePlayersList();
     }
     
     function updateAuthUI() {
         const widget = document.getElementById("authWidget");
         if (!widget) return;
         if (!currentUser) {
-            widget.innerHTML = `<button class="login-btn" id="twitchLoginBtn">🎮 Войти</button>`;
+            widget.innerHTML = `<button class="login-btn" id="twitchLoginBtn">🔥 Войти</button>`;
             const loginBtn = document.getElementById("twitchLoginBtn");
             if (loginBtn) {
                 loginBtn.addEventListener("click", showNicknameModal);
@@ -864,7 +840,7 @@
         } else {
             widget.innerHTML = `
                 <div class="user-info">
-                    <img class="avatar" src="${currentUser.avatar}" onerror="this.src='https://placehold.co/34x34/9147ff/white?text=U'">
+                    <img class="avatar" src="${currentUser.avatar}" onerror="this.src='https://placehold.co/34x34/ff6b6b/white?text=U'">
                     <span class="username">${escapeHtml(currentUser.username)}</span>
                     <button class="logout-btn" id="logoutTwitchBtn">выйти</button>
                 </div>
@@ -892,7 +868,7 @@
         if (!messageDiv) return;
         messageDiv.innerHTML = `💬 ${msg}`;
         setTimeout(() => {
-            if (messageDiv) messageDiv.innerHTML = `🎮 Нажми "Войти" → выбери ник → ставь пиксели | кулдаун ${COOLDOWN_SECONDS} сек`;
+            if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | 1920x1080`;
         }, duration);
     }
     
@@ -938,7 +914,7 @@
         });
         container.addEventListener("wheel", (e) => {
             e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.15 : 0.15;
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
             zoomAtPoint(delta, e.clientX, e.clientY);
         });
     }
@@ -952,9 +928,9 @@
         previewColorDiv = document.getElementById("previewColor");
         cooldownSpan = document.getElementById("cooldownText");
         totalPixelsSpan = document.getElementById("totalPixelsCount");
-        onlineCountSpan = document.getElementById("onlineCount");
+        playersCountSpan = document.getElementById("playersCount");
         messageDiv = document.getElementById("globalMessage");
-        activityPanel = document.getElementById("activityPanel");
+        playersPanel = document.getElementById("playersPanel");
         
         loadFromLocal();
         drawCanvas();
@@ -979,17 +955,13 @@
                     saveToLocal();
                     drawCanvas();
                     updateStats();
-                    showMessage("Поле полностью очищено! Все ячейки снова белые", 2000);
-                    addActivity("Администратор очистил всё поле", false);
+                    showMessage("Поле полностью очищено! Начинается новая битва", 2000);
                 }
             });
         }
         
         updateAuthUI();
-        if (currentUser) {
-            startCooldownTimerLoop();
-            startSimulation();
-        }
+        if (currentUser) startCooldownTimerLoop();
         
         document.body.addEventListener("click", () => {
             if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
@@ -999,9 +971,10 @@
             clampTransform();
         }, 100);
         
+        // Обновляем список игроков каждые 3 секунды
         setInterval(() => {
-            updateOnlineCount();
-        }, 5000);
+            updatePlayersList();
+        }, 3000);
     }
     
     window.addEventListener("resize", () => clampTransform());
