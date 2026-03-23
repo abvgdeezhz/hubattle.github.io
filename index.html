@@ -343,12 +343,13 @@
         messagingSenderId: "746603857511",
         appId: "1:746603857511:web:edf112bab36a5c9aa376c2",
         measurementId: "G-GGQ14FW7LF"
-    };
+     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const mapRef = db.ref('map');
     const totalRef = db.ref('total');
     const playersRef = db.ref('players');
+    const configRef = db.ref('config'); // узел для размеров холста
 
     // ========== ПАРАМЕТРЫ ИГРЫ ==========
     const MAP_WIDTH = 100;
@@ -385,6 +386,26 @@
     let cooldownInterval = null;
     let heartbeatInterval = null;
 
+    // ========== ЗАГРУЗКА РАЗМЕРОВ ХОЛСТА ИЗ FIREBASE ==========
+    function loadConfig() {
+        configRef.once('value', (snap) => {
+            const cfg = snap.val();
+            if (cfg && cfg.width && cfg.height) {
+                MAP_WIDTH = cfg.width;
+                MAP_HEIGHT = cfg.height;
+            } else {
+                // если нет конфига — создаём дефолтный
+                configRef.set({ width: MAP_WIDTH, height: MAP_HEIGHT });
+            }
+            // после загрузки размеров инициализируем карту
+            loadMapFromFirebase();
+        });
+    }
+
+    function saveConfig() {
+        configRef.set({ width: MAP_WIDTH, height: MAP_HEIGHT });
+    }
+
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
         pixelMap = new Array(MAP_WIDTH * MAP_HEIGHT);
@@ -392,27 +413,61 @@
     }
 
     // ========== FIREBASE: СОХРАНЕНИЕ / ЗАГРУЗКА ==========
-    function saveMapToFirebase() { mapRef.set(pixelMap); totalRef.set(totalPlaced); }
+    function saveMapToFirebase() {
+        mapRef.set(pixelMap);
+        totalRef.set(totalPlaced);
+    }
+
     function loadMapFromFirebase() {
         mapRef.once('value', (snap) => {
             const data = snap.val();
-            if (data && data.length === MAP_WIDTH * MAP_HEIGHT) { pixelMap = data; drawCanvas(); }
-            else { initMap(); saveMapToFirebase(); drawCanvas(); }
+            if (data && data.length === MAP_WIDTH * MAP_HEIGHT) {
+                pixelMap = data;
+            } else {
+                initMap();
+                saveMapToFirebase();
+            }
+            drawCanvas();
+            updateStats();
         });
-        totalRef.once('value', (snap) => { if (snap.val() !== null) totalPlaced = snap.val(); updateStats(); });
+        totalRef.once('value', (snap) => {
+            if (snap.val() !== null) totalPlaced = snap.val();
+            updateStats();
+        });
     }
+
     function listenForChanges() {
         mapRef.on('value', (snap) => {
             const newMap = snap.val();
-            if (newMap) {
+            if (newMap && newMap.length === MAP_WIDTH * MAP_HEIGHT) {
                 let changed = false;
-                for (let i = 0; i < newMap.length; i++) if (pixelMap[i] !== newMap[i]) { pixelMap[i] = newMap[i]; changed = true; }
+                for (let i = 0; i < newMap.length; i++) {
+                    if (pixelMap[i] !== newMap[i]) {
+                        pixelMap[i] = newMap[i];
+                        changed = true;
+                    }
+                }
                 if (changed) drawCanvas();
             }
         });
-        totalRef.on('value', (snap) => { const newTotal = snap.val(); if (newTotal !== null && newTotal !== totalPlaced) { totalPlaced = newTotal; updateStats(); } });
+        totalRef.on('value', (snap) => {
+            const newTotal = snap.val();
+            if (newTotal !== null && newTotal !== totalPlaced) {
+                totalPlaced = newTotal;
+                updateStats();
+            }
+        });
+        // Слушаем изменения конфига (если админка изменила размер)
+        configRef.on('value', (snap) => {
+            const cfg = snap.val();
+            if (cfg && cfg.width && cfg.height && (cfg.width !== MAP_WIDTH || cfg.height !== MAP_HEIGHT)) {
+                MAP_WIDTH = cfg.width;
+                MAP_HEIGHT = cfg.height;
+                loadMapFromFirebase(); // перезагружаем карту с новыми размерами
+                resetView(); // сбрасываем вид
+            }
+        });
     }
-
     // ========== ИГРОКИ ОНЛАЙН ==========
     function updatePlayerPresence() {
         if (!currentUser) return;
