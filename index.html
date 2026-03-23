@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>HuBattle — Битва пикселей</title>
+    <title>HuBattle — Мультиплеерная битва пикселей</title>
     <style>
         * {
             margin: 0;
@@ -29,120 +29,105 @@
         }
 
         .top-bar {
-            background: rgba(10, 14, 24, 0.98);
+            background: rgba(10, 14, 24, 0.95);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(255, 107, 107, 0.3);
-            padding: 8px 20px;
+            padding: 6px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 10px;
             z-index: 100;
             flex-shrink: 0;
         }
 
         .logo h1 {
-            font-size: 1.6rem;
+            font-size: 1.4rem;
             background: linear-gradient(135deg, #ff6b6b, #ff8e53);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            letter-spacing: -0.5px;
         }
 
         .logo p {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: #ffaa88;
-            opacity: 0.9;
         }
 
         .auth-widget {
             background: #1e1f2e;
-            padding: 5px 16px;
-            border-radius: 60px;
+            padding: 4px 14px;
+            border-radius: 40px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
         }
 
         .user-info {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .avatar {
-            width: 34px;
-            height: 34px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             border: 2px solid #ff6b6b;
             object-fit: cover;
-            background: #2d2f3a;
         }
 
         .username {
             font-weight: bold;
             color: #ffffff;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         .logout-btn, .login-btn {
             background: none;
             border: none;
             cursor: pointer;
-            font-size: 0.75rem;
-            padding: 4px 10px;
+            font-size: 0.7rem;
+            padding: 4px 8px;
             border-radius: 30px;
             transition: 0.2s;
         }
 
-        .logout-btn {
-            color: #ff9e8c;
-        }
-
-        .logout-btn:hover {
-            background: rgba(255, 80, 80, 0.2);
-        }
+        .logout-btn { color: #ff9e8c; }
+        .logout-btn:hover { background: rgba(255, 80, 80, 0.2); }
 
         .login-btn {
             background: #ff6b6b;
             color: white;
             font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
-
-        .login-btn:hover {
-            background: #ff8e53;
-            transform: scale(0.97);
-        }
+        .login-btn:hover { background: #ff8e53; }
 
         .toolbar {
             background: rgba(18, 22, 35, 0.95);
             backdrop-filter: blur(8px);
-            padding: 8px 20px;
+            padding: 6px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
-            gap: 15px;
+            gap: 10px;
             border-bottom: 1px solid rgba(255, 107, 107, 0.2);
             flex-shrink: 0;
         }
 
         .palette {
             display: flex;
-            gap: 6px;
+            gap: 5px;
             flex-wrap: wrap;
-            max-width: 500px;
+            max-width: 450px;
         }
 
         .color-option {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
             cursor: pointer;
             transition: all 0.1s ease;
             border: 2px solid transparent;
@@ -150,7 +135,7 @@
         }
 
         .color-option.active {
-            transform: scale(1.1);
+            transform: scale(1.08);
             border: 2px solid white;
             box-shadow: 0 0 0 2px #ff6b6b;
         }
@@ -158,54 +143,43 @@
         .selected-info {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             background: rgba(0, 0, 0, 0.5);
-            padding: 5px 15px;
-            border-radius: 40px;
-        }
-
-        .selected-info span {
-            color: white;
+            padding: 4px 12px;
+            border-radius: 30px;
         }
 
         .preview-color {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
             border: 1px solid white;
         }
 
         .cooldown-indicator {
             background: #1e1f2e;
-            padding: 5px 16px;
+            padding: 4px 14px;
             border-radius: 40px;
             font-family: monospace;
             font-weight: bold;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            font-size: 0.85rem;
             color: white;
         }
 
         .reset-btn {
             background: #2a2f42;
             border: none;
-            padding: 5px 14px;
+            padding: 4px 12px;
             border-radius: 30px;
             color: #ffb347;
             cursor: pointer;
-            font-size: 0.75rem;
-        }
-
-        .reset-btn:hover {
-            background: #3a405a;
+            font-size: 0.7rem;
         }
 
         .stats {
             display: flex;
-            gap: 15px;
-            font-size: 0.8rem;
+            gap: 12px;
+            font-size: 0.75rem;
             color: white;
         }
 
@@ -214,11 +188,7 @@
             position: relative;
             overflow: hidden;
             background: #05070c;
-            cursor: grab;
-        }
-
-        .canvas-container:active {
-            cursor: grabbing;
+            cursor: crosshair;
         }
 
         #battleCanvas {
@@ -227,66 +197,38 @@
             left: 0;
             image-rendering: crisp-edges;
             image-rendering: pixelated;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: crosshair;
         }
 
         .message-area {
             position: fixed;
-            bottom: 20px;
+            bottom: 15px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(12px);
-            padding: 8px 20px;
-            border-radius: 60px;
-            font-size: 0.8rem;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.75rem;
             color: white;
             pointer-events: none;
             z-index: 200;
             white-space: nowrap;
-            font-weight: 500;
             border: 1px solid rgba(255, 107, 107, 0.3);
-        }
-
-        .zoom-controls {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 8px;
-            z-index: 200;
-        }
-
-        .zoom-btn {
-            background: #1e1f2e;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 30px;
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: white;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            box-shadow: 0 2px 8px black;
-        }
-
-        .zoom-btn:hover {
-            background: #ff6b6b;
         }
 
         .players-panel {
             position: fixed;
-            bottom: 20px;
-            left: 20px;
+            bottom: 15px;
+            left: 15px;
             background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(8px);
-            padding: 8px 15px;
-            border-radius: 30px;
+            padding: 6px 12px;
+            border-radius: 20px;
             font-size: 0.7rem;
             color: #ffaa88;
             font-family: monospace;
-            max-width: 300px;
+            max-width: 280px;
             z-index: 200;
             pointer-events: none;
             white-space: nowrap;
@@ -299,7 +241,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             backdrop-filter: blur(8px);
             display: flex;
             justify-content: center;
@@ -309,23 +251,18 @@
 
         .modal-content {
             background: #1e2438;
-            border-radius: 32px;
-            padding: 30px;
-            width: 340px;
+            border-radius: 28px;
+            padding: 25px;
+            width: 320px;
             text-align: center;
             border: 1px solid #ff6b6b;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
 
-        .modal-content h3 {
-            color: white;
-            margin-bottom: 20px;
-        }
-
+        .modal-content h3 { color: white; margin-bottom: 20px; }
         .modal-content input {
             width: 100%;
-            padding: 12px;
-            border-radius: 60px;
+            padding: 10px;
+            border-radius: 50px;
             border: none;
             background: #2d2f3e;
             color: white;
@@ -334,27 +271,21 @@
             margin-bottom: 20px;
             outline: none;
         }
-
-        .modal-content input::placeholder {
-            color: #888;
-        }
-
         .modal-content button {
             background: #ff6b6b;
             border: none;
-            padding: 10px 24px;
-            border-radius: 60px;
+            padding: 8px 20px;
+            border-radius: 50px;
             color: white;
             font-weight: bold;
             cursor: pointer;
             width: 100%;
         }
 
-        @media (max-width: 800px) {
-            .color-option { width: 28px; height: 28px; }
-            .toolbar { padding: 6px 12px; }
-            .stats { font-size: 0.7rem; }
-            .message-area { white-space: nowrap; font-size: 0.7rem; }
+        @media (max-width: 900px) {
+            .color-option { width: 26px; height: 26px; }
+            .palette { max-width: 300px; }
+            .stats { font-size: 0.65rem; }
             .players-panel { font-size: 0.6rem; max-width: 180px; }
         }
     </style>
@@ -364,7 +295,7 @@
     <div class="top-bar">
         <div class="logo">
             <h1>🔥 HUBATTLE 🔥</h1>
-            <p>1920x1080 | битва за холст | кулдаун 3 сек</p>
+            <p>мультиплеер | реальные игроки | кулдаун 3 сек</p>
         </div>
         <div class="auth-widget" id="authWidget"></div>
     </div>
@@ -372,44 +303,39 @@
     <div class="toolbar">
         <div class="palette" id="colorPalette"></div>
         <div class="selected-info">
-            <span>🎨 текущий цвет</span>
+            <span>🎨</span>
             <div class="preview-color" id="previewColor"></div>
         </div>
         <div class="cooldown-indicator">
-            🔥 <span id="cooldownText">готов к битве</span>
+            ⏱️ <span id="cooldownText">готов</span>
         </div>
         <div class="stats">
-            <span>📊 пикселей: <span id="totalPixelsCount">0</span></span>
-            <span>👥 игроков: <span id="playersCount">1</span></span>
-            <button class="reset-btn" id="resetBoardBtn">♻️ СБРОС</button>
+            <span>📊 <span id="totalPixelsCount">0</span></span>
+            <span>👥 <span id="playersCount">0</span></span>
+            <button class="reset-btn" id="resetBoardBtn">♻️</button>
         </div>
     </div>
 
     <div class="canvas-container" id="canvasContainer">
         <canvas id="battleCanvas"></canvas>
     </div>
-    <div class="zoom-controls">
-        <button class="zoom-btn" id="zoomOutBtn">−</button>
-        <button class="zoom-btn" id="zoomInBtn">+</button>
-        <button class="zoom-btn" id="resetViewBtn">⌗</button>
-    </div>
     <div class="players-panel" id="playersPanel">
-        👥 активные игроки: ...
+        👥 загрузка...
     </div>
     <div class="message-area" id="globalMessage">
-        🎮 Нажми "Войти" → выбери ник → ставь пиксели | кулдаун 3 сек
+        🔥 Нажми "Войти" → ставь пиксели | кулдаун 3 сек
     </div>
 </div>
 
 <script>
     // ========== КОНФИГУРАЦИЯ ==========
-    // ХОЛСТ 1920x1080 (соотношение 16:9)
-    const MAP_WIDTH = 192;
-    const MAP_HEIGHT = 108;
-    const PIXEL_SIZE = 10;  // 192*10=1920, 108*10=1080
+    // АДАПТИВНЫЙ ХОЛСТ — подстраивается под размер экрана
+    let MAP_WIDTH = 120;
+    let MAP_HEIGHT = 68;
+    let PIXEL_SIZE = 10;
     const COOLDOWN_SECONDS = 3;
     
-    // РАСШИРЕННАЯ ПАЛИТРА (32 цвета)
+    // РАСШИРЕННАЯ ПАЛИТРА (40 цветов)
     const PALETTE = [
         "#FF4444", "#FF8844", "#FFDD44", "#88FF44", "#44FF88",
         "#44FFDD", "#44AAFF", "#8844FF", "#FF44CC", "#FFFFFF",
@@ -417,7 +343,8 @@
         "#FF6B6B", "#4ECDC4", "#FFE66D", "#95E77E", "#FF9F4A",
         "#C77DFF", "#FF88C0", "#66CC88", "#88AAFF", "#FFB347",
         "#6A4E9B", "#E86A6A", "#6A9B6A", "#9B6A9B", "#6A8C9B",
-        "#D4AF37", "#CD5C5C", "#6495ED", "#DC143C", "#00FA9A"
+        "#D4AF37", "#CD5C5C", "#6495ED", "#DC143C", "#00FA9A",
+        "#FF4500", "#32CD32", "#FF1493", "#00BFFF", "#FFD700"
     ];
     
     // ---------- ГЛОБАЛЬНОЕ СОСТОЯНИЕ ----------
@@ -425,16 +352,13 @@
     let pixelAuthors = [];
     let totalPlaced = 0;
     let currentUser = null;
-    let userCooldowns = new Map();  // username -> timestamp
-    let activePlayers = new Set();   // реальные игроки на сайте
+    let userCooldowns = new Map();
+    let activePlayers = new Map(); // username -> timestamp последней активности
     let selectedColor = PALETTE[0];
     
-    // Canvas и трансформации
+    // Canvas
     let canvas, ctx, container;
-    let scale = 0.45;  // начальный масштаб чтобы видеть почти всё поле
-    let offsetX = 0, offsetY = 0;
     let isDragging = false;
-    let dragStart = { x: 0, y: 0 };
     
     // DOM элементы
     let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, messageDiv, playersPanel;
@@ -443,6 +367,39 @@
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
+    
+    // Синхронизация между вкладками
+    let syncInterval = null;
+    
+    // ========== ИНИЦИАЛИЗАЦИЯ АДАПТИВНОГО ХОЛСТА ==========
+    function calculateOptimalGrid() {
+        const container = document.getElementById('canvasContainer');
+        if (!container) return;
+        
+        const rect = container.getBoundingClientRect();
+        const availableWidth = rect.width;
+        const availableHeight = rect.height;
+        
+        // Оптимальный размер ячейки (8-12 пикселей)
+        let optimalCellSize = 10;
+        
+        // Рассчитываем оптимальное количество ячеек
+        let cols = Math.floor(availableWidth / optimalCellSize);
+        let rows = Math.floor(availableHeight / optimalCellSize);
+        
+        // Ограничиваем минимум и максимум
+        cols = Math.min(Math.max(cols, 80), 200);
+        rows = Math.min(Math.max(rows, 45), 120);
+        
+        // Корректируем размер ячейки под реальные размеры
+        PIXEL_SIZE = Math.floor(Math.min(availableWidth / cols, availableHeight / rows));
+        
+        // Пересчитываем окончательные размеры
+        MAP_WIDTH = cols;
+        MAP_HEIGHT = rows;
+        
+        console.log(`Холст адаптирован: ${MAP_WIDTH}x${MAP_HEIGHT}, ячейка ${PIXEL_SIZE}px`);
+    }
     
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
@@ -460,6 +417,9 @@
         localStorage.setItem("hubattleTotalPlaced", totalPlaced);
         if (currentUser) {
             localStorage.setItem("hubattleUsername", currentUser.username);
+            // Обновляем активность текущего игрока
+            activePlayers.set(currentUser.username, Date.now());
+            localStorage.setItem("hubattleActivePlayers", JSON.stringify(Array.from(activePlayers.entries())));
         }
     }
     
@@ -491,14 +451,29 @@
         const savedTotal = localStorage.getItem("hubattleTotalPlaced");
         totalPlaced = savedTotal ? parseInt(savedTotal) : 0;
         
+        // Загружаем активных игроков
+        const savedPlayers = localStorage.getItem("hubattleActivePlayers");
+        if (savedPlayers) {
+            try {
+                const parsed = JSON.parse(savedPlayers);
+                activePlayers = new Map(parsed);
+                // Очищаем старых игроков (более 2 минут)
+                const now = Date.now();
+                for (let [name, time] of activePlayers) {
+                    if (now - time > 120000) {
+                        activePlayers.delete(name);
+                    }
+                }
+            } catch(e) { }
+        }
+        
         const savedUsername = localStorage.getItem("hubattleUsername");
         if (savedUsername && !currentUser) {
             currentUser = {
                 username: savedUsername,
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(savedUsername.slice(0,2))}`,
-                token: "saved_" + Date.now()
             };
-            activePlayers.add(savedUsername);
+            activePlayers.set(savedUsername, Date.now());
             updateAuthUI();
             startCooldownTimerLoop();
         }
@@ -510,15 +485,15 @@
     // ========== ОТРИСОВКА CANVAS ==========
     function drawCanvas() {
         if (!canvas || !ctx) return;
+        
         const w = MAP_WIDTH * PIXEL_SIZE;
         const h = MAP_HEIGHT * PIXEL_SIZE;
+        
         canvas.width = w;
         canvas.height = h;
-        
-        canvas.style.width = `${w * scale}px`;
-        canvas.style.height = `${h * scale}px`;
-        canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-        canvas.style.transformOrigin = "0 0";
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.objectFit = 'contain';
         
         // Отрисовка пикселей
         for (let row = 0; row < MAP_HEIGHT; row++) {
@@ -529,72 +504,28 @@
             }
         }
         
-        // Сетка (только при достаточном зуме)
-        if (scale > 1.2) {
-            ctx.beginPath();
-            ctx.strokeStyle = "#cccccc";
-            ctx.lineWidth = 0.5;
-            for (let x = 0; x <= MAP_WIDTH; x++) {
-                ctx.moveTo(x * PIXEL_SIZE, 0);
-                ctx.lineTo(x * PIXEL_SIZE, h);
-                ctx.stroke();
-                ctx.moveTo(0, x * PIXEL_SIZE);
-                ctx.lineTo(w, x * PIXEL_SIZE);
-                ctx.stroke();
-            }
+        // Легкая сетка
+        ctx.beginPath();
+        ctx.strokeStyle = "#cccccc30";
+        ctx.lineWidth = 0.5;
+        for (let x = 0; x <= MAP_WIDTH; x++) {
+            ctx.moveTo(x * PIXEL_SIZE, 0);
+            ctx.lineTo(x * PIXEL_SIZE, h);
+            ctx.stroke();
+            ctx.moveTo(0, x * PIXEL_SIZE);
+            ctx.lineTo(w, x * PIXEL_SIZE);
+            ctx.stroke();
         }
     }
     
-    function clampTransform() {
-        if (!container) return;
-        const containerRect = container.getBoundingClientRect();
-        const virtualWidth = MAP_WIDTH * PIXEL_SIZE * scale;
-        const virtualHeight = MAP_HEIGHT * PIXEL_SIZE * scale;
-        const maxOffsetX = Math.max(0, virtualWidth - containerRect.width);
-        const maxOffsetY = Math.max(0, virtualHeight - containerRect.height);
-        offsetX = Math.min(0, Math.max(-maxOffsetX, offsetX));
-        offsetY = Math.min(0, Math.max(-maxOffsetY, offsetY));
-        drawCanvas();
-    }
-    
-    function zoomAtPoint(delta, clientX, clientY) {
-        const oldScale = scale;
-        let newScale = scale + delta;
-        newScale = Math.min(3, Math.max(0.3, newScale));
-        if (newScale === scale) return;
-        
-        const containerRect = container.getBoundingClientRect();
-        const mouseX = clientX - containerRect.left;
-        const mouseY = clientY - containerRect.top;
-        
-        const beforeX = (mouseX - offsetX) / oldScale;
-        const beforeY = (mouseY - offsetY) / oldScale;
-        
-        scale = newScale;
-        
-        const afterX = (mouseX - offsetX) / scale;
-        const afterY = (mouseY - offsetY) / scale;
-        
-        offsetX += (afterX - beforeX) * scale;
-        offsetY += (afterY - beforeY) * scale;
-        
-        clampTransform();
-    }
-    
-    function resetView() {
-        scale = 0.45;
-        offsetX = 0;
-        offsetY = 0;
-        clampTransform();
-    }
-    
-    // ========== ИСПРАВЛЕННОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ==========
+    // ========== ТОЧНОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ (исправлено!) ==========
     function getPixelIndexFromClick(clientX, clientY) {
         if (!canvas || !container) return -1;
         
         const canvasRect = canvas.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
         
-        // Координаты относительно canvas (в пикселях экрана)
+        // Координаты клика относительно canvas
         const relativeX = clientX - canvasRect.left;
         const relativeY = clientY - canvasRect.top;
         
@@ -602,13 +533,30 @@
             return -1;
         }
         
-        // Переводим в координаты виртуального canvas (учитываем масштаб и смещение)
-        // Важно: relativeX/relativeY уже в экранных пикселях, делим на scale чтобы получить координаты в мире canvas
-        const canvasX = relativeX / scale;
-        const canvasY = relativeY / scale;
+        // Масштабирование: canvas отображается с object-fit: contain
+        // Нужно определить масштаб отображения
+        const canvasDisplayWidth = canvasRect.width;
+        const canvasDisplayHeight = canvasRect.height;
+        const canvasRealWidth = MAP_WIDTH * PIXEL_SIZE;
+        const canvasRealHeight = MAP_HEIGHT * PIXEL_SIZE;
         
-        const col = Math.floor(canvasX / PIXEL_SIZE);
-        const row = Math.floor(canvasY / PIXEL_SIZE);
+        // Вычисляем масштаб отображения
+        const scaleX = canvasDisplayWidth / canvasRealWidth;
+        const scaleY = canvasDisplayHeight / canvasRealHeight;
+        const scale = Math.min(scaleX, scaleY);
+        
+        // Вычисляем смещение для центрирования
+        const offsetX = (canvasDisplayWidth - canvasRealWidth * scale) / 2;
+        const offsetY = (canvasDisplayHeight - canvasRealHeight * scale) / 2;
+        
+        // Координаты в реальном canvas
+        const realX = (relativeX - offsetX) / scale;
+        const realY = (relativeY - offsetY) / scale;
+        
+        if (realX < 0 || realY < 0) return -1;
+        
+        const col = Math.floor(realX / PIXEL_SIZE);
+        const row = Math.floor(realY / PIXEL_SIZE);
         
         if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) {
             return row * MAP_WIDTH + col;
@@ -616,56 +564,78 @@
         return -1;
     }
     
-    // ========== РЕАЛЬНЫЕ ИГРОКИ ==========
-    function updatePlayersList() {
-        if (!playersPanel) return;
-        
-        // Активные игроки - те, у кого есть кулдаун или текущий пользователь
-        const allPlayers = new Set(activePlayers);
-        if (currentUser) allPlayers.add(currentUser.username);
-        
-        // Добавляем игроков из кулдаунов (кто ставил пиксели недавно)
-        for (let [username, timestamp] of userCooldowns) {
-            if (Date.now() - timestamp < 60000) { // активен последнюю минуту
-                allPlayers.add(username);
-            }
+    // ========== МУЛЬТИПЛЕЕР: СИНХРОНИЗАЦИЯ ==========
+    function syncWithOtherTabs() {
+        // Загружаем последние данные из localStorage
+        const savedMap = localStorage.getItem("hubattleMap");
+        if (savedMap) {
+            try {
+                const parsed = JSON.parse(savedMap);
+                if (parsed.length === MAP_WIDTH * MAP_HEIGHT) {
+                    let changed = false;
+                    for (let i = 0; i < parsed.length; i++) {
+                        if (pixelMap[i] !== parsed[i]) {
+                            pixelMap[i] = parsed[i];
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        drawCanvas();
+                    }
+                }
+            } catch(e) { }
         }
         
-        const playersList = Array.from(allPlayers).filter(p => p).slice(0, 20);
-        
-        if (playersList.length === 0) {
-            playersPanel.innerHTML = "👥 ожидание игроков...";
-        } else {
-            playersPanel.innerHTML = `👥 активные (${playersList.length}): ${playersList.join(", ")}`;
+        // Синхронизируем авторов
+        const savedAuthors = localStorage.getItem("hubattleAuthors");
+        if (savedAuthors) {
+            try {
+                const parsed = JSON.parse(savedAuthors);
+                if (parsed.length === MAP_WIDTH * MAP_HEIGHT) {
+                    pixelAuthors = parsed;
+                }
+            } catch(e) { }
         }
         
-        if (playersCountSpan) playersCountSpan.innerText = playersList.length;
-    }
-    
-    function addRealPlayer(username) {
-        if (username && username !== currentUser?.username) {
-            activePlayers.add(username);
-            setTimeout(() => {
-                // Удаляем через 2 минуты неактивности
-                if (!userCooldowns.has(username) && username !== currentUser?.username) {
-                    activePlayers.delete(username);
+        // Синхронизируем общее количество
+        const savedTotal = localStorage.getItem("hubattleTotalPlaced");
+        if (savedTotal) {
+            totalPlaced = parseInt(savedTotal) || 0;
+            updateStats();
+        }
+        
+        // Синхронизируем активных игроков
+        const savedPlayers = localStorage.getItem("hubattleActivePlayers");
+        if (savedPlayers) {
+            try {
+                const parsed = JSON.parse(savedPlayers);
+                const newPlayers = new Map(parsed);
+                const now = Date.now();
+                for (let [name, time] of newPlayers) {
+                    if (now - time < 120000) {
+                        if (!activePlayers.has(name) && name !== currentUser?.username) {
+                            activePlayers.set(name, time);
+                        }
+                    }
                 }
                 updatePlayersList();
-            }, 120000);
+            } catch(e) { }
         }
-        updatePlayersList();
+    }
+    
+    function broadcastChange(index, color, username) {
+        // Сохраняем в localStorage для других вкладок
+        saveToLocal();
+        // Принудительно обновляем других
+        localStorage.setItem("hubattle_lastUpdate", Date.now().toString());
     }
     
     // ========== ЗВУК ==========
-    function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-    }
-    
     function playCooldownEndSound() {
         try {
-            initAudio();
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const now = audioCtx.currentTime;
             const osc = audioCtx.createOscillator();
@@ -678,7 +648,7 @@
             gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
             osc.start();
             osc.stop(now + 0.35);
-        } catch(e) { console.warn("audio error"); }
+        } catch(e) { }
     }
     
     // ========== КУЛДАУН ==========
@@ -698,9 +668,9 @@
         return Math.ceil(COOLDOWN_SECONDS - elapsed);
     }
     
-    function updateCooldownUIAndSound() {
+    function updateCooldownUI() {
         if (!currentUser) {
-            if (cooldownSpan) cooldownSpan.innerText = "🔒 войдите";
+            if (cooldownSpan) cooldownSpan.innerText = "войдите";
             return;
         }
         const remain = getRemainingSeconds(currentUser.username);
@@ -708,34 +678,32 @@
         const isReadyNow = (remain === 0);
         
         if (isReadyNow) {
-            cooldownSpan.innerHTML = "✅ ГОТОВ!";
+            cooldownSpan.innerHTML = "✅ ГОТОВ";
             if (!wasReady && currentUser) {
                 playCooldownEndSound();
-                showMessage("🔊 Кулдаун закончился! Можешь ставить пиксель!", 1200);
+                showMessage("🔊 Кулдаун закончился!", 1000);
             }
             lastCooldownState = 0;
         } else {
-            cooldownSpan.innerHTML = `⏳ ${remain} сек`;
+            cooldownSpan.innerHTML = `⏳ ${remain}c`;
             lastCooldownState = 1;
         }
     }
     
     function startCooldownTimerLoop() {
         if (cooldownInterval) clearInterval(cooldownInterval);
-        cooldownInterval = setInterval(() => {
-            updateCooldownUIAndSound();
-        }, 200);
+        cooldownInterval = setInterval(updateCooldownUI, 200);
     }
     
     // ========== УСТАНОВКА ПИКСЕЛЯ ==========
     function placePixel(index, colorHex, username) {
         if (!currentUser || currentUser.username !== username) {
-            showMessage("❌ Ошибка авторизации", 1500);
+            showMessage("❌ Ошибка авторизации", 1000);
             return false;
         }
         if (isOnCooldown(username)) {
             const sec = getRemainingSeconds(username);
-            showMessage(`⚠️ Кулдаун! Подожди ${sec} сек`, 1500);
+            showMessage(`⚠️ Кулдаун! ${sec} сек`, 1000);
             return false;
         }
         if (index < 0 || index >= pixelMap.length) return false;
@@ -747,26 +715,67 @@
         pixelAuthors[index] = username;
         userCooldowns.set(username, Date.now());
         totalPlaced++;
-        saveToLocal();
+        
+        // Обновляем активность игрока
+        activePlayers.set(username, Date.now());
+        
         drawCanvas();
         updateStats();
-        updateCooldownUIAndSound();
+        updateCooldownUI();
+        broadcastChange(index, colorHex, username);
         
-        showMessage(`🎨 ${username} поставил пиксель на (${row},${col})!`, 800);
-        
+        showMessage(`🎨 ${username} поставил пиксель (${row},${col})!`, 800);
         updatePlayersList();
         return true;
     }
     
     function onCanvasClick(e) {
         if (!currentUser) {
-            showMessage("🔐 Сначала войди (кнопка сверху)", 1500);
+            showMessage("🔐 Сначала войди", 1200);
             return;
         }
         const idx = getPixelIndexFromClick(e.clientX, e.clientY);
         if (idx !== -1) {
             placePixel(idx, selectedColor, currentUser.username);
         }
+    }
+    
+    // ========== ОБНОВЛЕНИЕ СПИСКА ИГРОКОВ ==========
+    function updatePlayersList() {
+        if (!playersPanel) return;
+        
+        const now = Date.now();
+        // Очищаем старых игроков (неактивны более 2 минут)
+        for (let [name, time] of activePlayers) {
+            if (now - time > 120000 && name !== currentUser?.username) {
+                activePlayers.delete(name);
+            }
+        }
+        
+        // Обновляем активность текущего игрока
+        if (currentUser) {
+            activePlayers.set(currentUser.username, now);
+        }
+        
+        // Добавляем игроков из кулдаунов
+        for (let [name, time] of userCooldowns) {
+            if (now - time < 60000) {
+                activePlayers.set(name, now);
+            }
+        }
+        
+        const playersList = Array.from(activePlayers.keys()).filter(p => p).sort();
+        
+        if (playersList.length === 0) {
+            playersPanel.innerHTML = "👥 ожидание игроков...";
+        } else {
+            playersPanel.innerHTML = `👥 игроки (${playersList.length}): ${playersList.join(", ")}`;
+        }
+        
+        if (playersCountSpan) playersCountSpan.innerText = playersList.length;
+        
+        // Сохраняем в localStorage для других вкладок
+        localStorage.setItem("hubattleActivePlayers", JSON.stringify(Array.from(activePlayers.entries())));
     }
     
     // ========== АВТЕНТИФИКАЦИЯ ==========
@@ -776,101 +785,72 @@
         modal.innerHTML = `
             <div class="modal-content">
                 <h3>🔥 Вход в HuBattle</h3>
-                <input type="text" id="nicknameInput" placeholder="Введите ваш никнейм" maxlength="20" autocomplete="off">
-                <button id="confirmAuthBtn">⚡ Войти и рисовать</button>
+                <input type="text" id="nicknameInput" placeholder="Введите никнейм" maxlength="20" autocomplete="off">
+                <button id="confirmAuthBtn">⚡ Войти</button>
             </div>
         `;
         document.body.appendChild(modal);
         
         const input = modal.querySelector('#nicknameInput');
         const confirmBtn = modal.querySelector('#confirmAuthBtn');
-        
         input.focus();
         
         const doAuth = () => {
             let nickname = input.value.trim();
-            if (!nickname) {
-                nickname = "Воин_" + Math.floor(Math.random() * 1000);
-            }
+            if (!nickname) nickname = "Воин_" + Math.floor(Math.random() * 1000);
+            
             currentUser = {
                 username: nickname,
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`,
-                token: "auth_" + Date.now()
             };
-            activePlayers.add(nickname);
+            activePlayers.set(nickname, Date.now());
             saveToLocal();
             updateAuthUI();
-            showMessage(`✨ Добро пожаловать, ${nickname}! Ставь пиксели!`, 2500);
-            updateCooldownUIAndSound();
+            showMessage(`✨ Добро пожаловать, ${nickname}!`, 2000);
+            updateCooldownUI();
             startCooldownTimerLoop();
             updatePlayersList();
             modal.remove();
         };
         
         confirmBtn.addEventListener('click', doAuth);
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') doAuth();
-        });
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') doAuth(); });
     }
     
     function logout() {
-        if (currentUser) {
-            activePlayers.delete(currentUser.username);
-        }
+        if (currentUser) activePlayers.delete(currentUser.username);
         currentUser = null;
         localStorage.removeItem("hubattleUsername");
         updateAuthUI();
-        updateStats();
         if (cooldownInterval) clearInterval(cooldownInterval);
         cooldownInterval = null;
-        if (cooldownSpan) cooldownSpan.innerText = "🔒 войдите";
-        showMessage("👋 Вы вышли из аккаунта", 1500);
+        if (cooldownSpan) cooldownSpan.innerText = "войдите";
+        showMessage("👋 Вы вышли", 1000);
         updatePlayersList();
+        saveToLocal();
     }
     
     function updateAuthUI() {
         const widget = document.getElementById("authWidget");
         if (!widget) return;
         if (!currentUser) {
-            widget.innerHTML = `<button class="login-btn" id="twitchLoginBtn">🔥 Войти</button>`;
-            const loginBtn = document.getElementById("twitchLoginBtn");
-            if (loginBtn) {
-                loginBtn.addEventListener("click", showNicknameModal);
-            }
+            widget.innerHTML = `<button class="login-btn" id="loginBtn">🔥 Войти</button>`;
+            document.getElementById("loginBtn")?.addEventListener("click", showNicknameModal);
         } else {
             widget.innerHTML = `
                 <div class="user-info">
-                    <img class="avatar" src="${currentUser.avatar}" onerror="this.src='https://placehold.co/34x34/ff6b6b/white?text=U'">
+                    <img class="avatar" src="${currentUser.avatar}">
                     <span class="username">${escapeHtml(currentUser.username)}</span>
-                    <button class="logout-btn" id="logoutTwitchBtn">выйти</button>
+                    <button class="logout-btn" id="logoutBtn">выйти</button>
                 </div>
             `;
-            const logoutBtn = document.getElementById("logoutTwitchBtn");
-            if (logoutBtn) logoutBtn.addEventListener("click", logout);
+            document.getElementById("logoutBtn")?.addEventListener("click", logout);
         }
     }
     
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-    
-    function updateStats() {
-        if (totalPixelsSpan) totalPixelsSpan.innerText = totalPlaced;
-    }
-    
-    function showMessage(msg, duration = 2000) {
-        if (!messageDiv) return;
-        messageDiv.innerHTML = `💬 ${msg}`;
-        setTimeout(() => {
-            if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | 1920x1080`;
-        }, duration);
-    }
+    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m) { return m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'; }); }
+    function updateStats() { if (totalPixelsSpan) totalPixelsSpan.innerText = totalPlaced; }
+    function showMessage(msg, duration) { if (!messageDiv) return; messageDiv.innerHTML = `💬 ${msg}`; setTimeout(() => { if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | реальные игроки`; }, duration); }
     
     function buildPalette() {
         if (!colorPaletteDiv) return;
@@ -891,32 +871,10 @@
         if (previewColorDiv) previewColorDiv.style.backgroundColor = selectedColor;
     }
     
-    function setupPanning() {
-        if (!container) return;
-        container.addEventListener("mousedown", (e) => {
-            if (e.target === canvas || container.contains(e.target)) {
-                isDragging = true;
-                dragStart.x = e.clientX - offsetX;
-                dragStart.y = e.clientY - offsetY;
-                container.style.cursor = "grabbing";
-                e.preventDefault();
-            }
-        });
-        window.addEventListener("mousemove", (e) => {
-            if (!isDragging) return;
-            offsetX = e.clientX - dragStart.x;
-            offsetY = e.clientY - dragStart.y;
-            clampTransform();
-        });
-        window.addEventListener("mouseup", () => {
-            isDragging = false;
-            if (container) container.style.cursor = "grab";
-        });
-        container.addEventListener("wheel", (e) => {
-            e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            zoomAtPoint(delta, e.clientX, e.clientY);
-        });
+    function handleResize() {
+        calculateOptimalGrid();
+        loadFromLocal();
+        drawCanvas();
     }
     
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
@@ -932,30 +890,23 @@
         messageDiv = document.getElementById("globalMessage");
         playersPanel = document.getElementById("playersPanel");
         
+        calculateOptimalGrid();
         loadFromLocal();
         drawCanvas();
         buildPalette();
-        setupPanning();
         
-        if (canvas) canvas.addEventListener("click", onCanvasClick);
+        canvas.addEventListener("click", onCanvasClick);
         
-        const zoomInBtn = document.getElementById("zoomInBtn");
-        const zoomOutBtn = document.getElementById("zoomOutBtn");
-        const resetViewBtn = document.getElementById("resetViewBtn");
         const resetBoardBtn = document.getElementById("resetBoardBtn");
-        
-        if (zoomInBtn) zoomInBtn.addEventListener("click", () => zoomAtPoint(0.2, container.clientWidth/2, container.clientHeight/2));
-        if (zoomOutBtn) zoomOutBtn.addEventListener("click", () => zoomAtPoint(-0.2, container.clientWidth/2, container.clientHeight/2));
-        if (resetViewBtn) resetViewBtn.addEventListener("click", resetView);
         if (resetBoardBtn) {
             resetBoardBtn.addEventListener("click", () => {
-                if (confirm("Сбросить всё поле? Все пиксели станут белыми!")) {
+                if (confirm("Сбросить всё поле?")) {
                     initMap();
                     totalPlaced = 0;
                     saveToLocal();
                     drawCanvas();
                     updateStats();
-                    showMessage("Поле полностью очищено! Начинается новая битва", 2000);
+                    showMessage("Поле очищено!", 1500);
                 }
             });
         }
@@ -963,21 +914,32 @@
         updateAuthUI();
         if (currentUser) startCooldownTimerLoop();
         
+        // Синхронизация между вкладками
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'hubattleMap' || e.key === 'hubattle_lastUpdate') {
+                syncWithOtherTabs();
+            }
+        });
+        
+        // Обновляем список игроков каждые 2 секунды
+        setInterval(() => updatePlayersList(), 2000);
+        setInterval(() => syncWithOtherTabs(), 1000);
+        
+        window.addEventListener('resize', () => {
+            setTimeout(() => {
+                calculateOptimalGrid();
+                loadFromLocal();
+                drawCanvas();
+            }, 100);
+        });
+        
         document.body.addEventListener("click", () => {
             if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
         }, { once: true });
         
-        setTimeout(() => {
-            clampTransform();
-        }, 100);
-        
-        // Обновляем список игроков каждые 3 секунды
-        setInterval(() => {
-            updatePlayersList();
-        }, 3000);
+        setTimeout(() => drawCanvas(), 100);
     }
     
-    window.addEventListener("resize", () => clampTransform());
     init();
 </script>
 </body>
