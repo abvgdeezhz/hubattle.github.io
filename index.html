@@ -192,23 +192,6 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
 
-        .message-area {
-            position: fixed;
-            bottom: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(12px);
-            padding: 6px 16px;
-            border-radius: 40px;
-            font-size: 0.75rem;
-            color: white;
-            pointer-events: none;
-            z-index: 200;
-            white-space: nowrap;
-            border: 1px solid rgba(255, 107, 107, 0.3);
-        }
-
         .players-panel {
             position: fixed;
             bottom: 15px;
@@ -344,9 +327,6 @@
     <div class="players-panel" id="playersPanel">
         👥 загрузка...
     </div>
-    <div class="message-area" id="globalMessage">
-        🔥 Нажми "Войти" → выбери ник → ставь пиксели | кулдаун 3 сек
-    </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
@@ -401,7 +381,7 @@
     let dragStart = { x: 0, y: 0 };
     let canvasCenterX = 0, canvasCenterY = 0;
 
-    let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, messageDiv, playersPanel;
+    let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, playersPanel;
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
@@ -653,7 +633,7 @@
             cooldownSpan.innerHTML = "✅ ГОТОВ";
             if (!wasReady && currentUser) {
                 playCooldownEndSound();
-                showMessage("🔊 Кулдаун закончился!", 1000);
+                // сообщение не показываем (нет messageDiv)
             }
             lastCooldownState = 0;
         } else {
@@ -670,12 +650,11 @@
     // ========== УСТАНОВКА ПИКСЕЛЯ ==========
     function placePixel(index, colorHex, username) {
         if (!currentUser || currentUser.username !== username) {
-            showMessage("❌ Ошибка авторизации", 1000);
+            // сообщение не выводим
             return false;
         }
         if (isOnCooldown(username)) {
-            const sec = getRemainingSeconds(username);
-            showMessage(`⚠️ Кулдаун! ${sec} сек`, 1000);
+            // сообщение не выводим
             return false;
         }
         if (index < 0 || index >= pixelMap.length) return false;
@@ -693,15 +672,11 @@
         saveMapToFirebase();
         updatePlayerPresence();
 
-        showMessage(`🎨 ${username} поставил пиксель (${row},${col})!`, 800);
         return true;
     }
 
     function onCanvasClick(e) {
-        if (!currentUser) {
-            showMessage("🔐 Сначала войди", 1200);
-            return;
-        }
+        if (!currentUser) return;
         const idx = getPixelIndexFromClick(e.clientX, e.clientY);
         if (idx !== -1) {
             placePixel(idx, selectedColor, currentUser.username);
@@ -733,7 +708,6 @@
             };
             localStorage.setItem("hubattle_username", nickname);
             updateAuthUI();
-            showMessage(`✨ Добро пожаловать, ${nickname}!`, 2000);
             updateCooldownUI();
             startCooldownTimerLoop();
             updatePlayerPresence();
@@ -756,7 +730,6 @@
         if (heartbeatInterval) clearInterval(heartbeatInterval);
         heartbeatInterval = null;
         if (cooldownSpan) cooldownSpan.innerText = "войдите";
-        showMessage("👋 Вы вышли", 1000);
     }
 
     function updateAuthUI() {
@@ -779,7 +752,6 @@
 
     function escapeHtml(str) { return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
     function updateStats() { if (totalPixelsSpan) totalPixelsSpan.innerText = totalPlaced; }
-    function showMessage(msg, duration) { if (!messageDiv) return; messageDiv.innerHTML = `💬 ${msg}`; setTimeout(() => { if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | зум под курсор | битва за Ху Гарден`; }, duration); }
 
     function buildPalette() {
         if (!colorPaletteDiv) return;
@@ -848,7 +820,6 @@
         cooldownSpan = document.getElementById("cooldownText");
         totalPixelsSpan = document.getElementById("totalPixelsCount");
         playersCountSpan = document.getElementById("playersCount");
-        messageDiv = document.getElementById("globalMessage");
         playersPanel = document.getElementById("playersPanel");
 
         initMap();
