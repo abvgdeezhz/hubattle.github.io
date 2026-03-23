@@ -225,16 +225,16 @@
             left: 15px;
             background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(8px);
-            padding: 6px 12px;
+            padding: 8px 15px;
             border-radius: 20px;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: #ffaa88;
             font-family: monospace;
-            max-width: 300px;
+            max-width: 400px;
             z-index: 200;
             pointer-events: none;
-            white-space: nowrap;
             overflow-x: auto;
+            white-space: nowrap;
         }
 
         .zoom-controls {
@@ -314,7 +314,7 @@
         @media (max-width: 900px) {
             .color-option { width: 28px; height: 28px; }
             .palette { max-width: 350px; }
-            .players-panel { max-width: 220px; font-size: 0.6rem; }
+            .players-panel { max-width: 280px; font-size: 0.65rem; }
         }
     </style>
 </head>
@@ -323,7 +323,7 @@
     <div class="top-bar">
         <div class="logo">
             <h1>🔥 HUBATTLE 🔥</h1>
-            <p>100x60 | мультиплеер | зум колесиком | кулдаун 3 сек</p>
+            <p>100x60 | мультиплеер | зум под курсор</p>
         </div>
         <div class="auth-widget" id="authWidget"></div>
     </div>
@@ -356,18 +356,18 @@
         👥 загрузка...
     </div>
     <div class="message-area" id="globalMessage">
-        🔥 Нажми "Войти" → ставь пиксели | кулдаун 3 сек | зум колёсиком
+        🔥 Нажми "Войти" → выбери ник → ставь пиксели | кулдаун 3 сек
     </div>
 </div>
 
 <script>
-    // ========== ФИКСИРОВАННЫЙ ХОЛСТ (оптимальный для всех экранов) ==========
+    // ========== КОНФИГУРАЦИЯ ==========
     const MAP_WIDTH = 100;
     const MAP_HEIGHT = 60;
     const BASE_PIXEL_SIZE = 12;
     const COOLDOWN_SECONDS = 3;
     
-    // РАСШИРЕННАЯ ПАЛИТРА (40 цветов)
+    // ПАЛИТРА (40 цветов)
     const PALETTE = [
         "#FF4444", "#FF8844", "#FFDD44", "#88FF44", "#44FF88",
         "#44FFDD", "#44AAFF", "#8844FF", "#FF44CC", "#FFFFFF",
@@ -385,8 +385,9 @@
     let totalPlaced = 0;
     let currentUser = null;
     let userCooldowns = new Map();
-    let activePlayers = new Map();
+    let onlinePlayers = new Map(); // username -> { lastSeen, avatar }
     let selectedColor = PALETTE[0];
+    let playerId = Math.random().toString(36).substr(2, 9);
     
     // Canvas и трансформации
     let canvas, ctx, container;
@@ -394,6 +395,7 @@
     let offsetX = 0, offsetY = 0;
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
+    let canvasCenterX = 0, canvasCenterY = 0;
     
     // DOM элементы
     let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, messageDiv, playersPanel;
@@ -402,6 +404,8 @@
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
+    let heartbeatInterval = null;
+    let syncInterval = null;
     
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
@@ -417,11 +421,11 @@
         localStorage.setItem("hubattleMap", JSON.stringify(pixelMap));
         localStorage.setItem("hubattleAuthors", JSON.stringify(pixelAuthors));
         localStorage.setItem("hubattleTotalPlaced", totalPlaced);
-        if (currentUser) {
-            localStorage.setItem("hubattleUsername", currentUser.username);
-            activePlayers.set(currentUser.username, Date.now());
-            localStorage.setItem("hubattleActivePlayers", JSON.stringify(Array.from(activePlayers.entries())));
-        }
+        
+        // Сохраняем онлайн игроков
+        const playersData = Array.from(onlinePlayers.entries()).map(([name, data]) => [name, { lastSeen: data.lastSeen, avatar: data.avatar }]);
+        localStorage.setItem("hubattleOnlinePlayers", JSON.stringify(playersData));
+        localStorage.setItem("hubattleLastUpdate", Date.now().toString());
     }
     
     function loadFromLocal() {
@@ -441,25 +445,22 @@
         
         const savedAuthors = localStorage.getItem("hubattleAuthors");
         if (savedAuthors) {
-            try {
-                const parsed = JSON.parse(savedAuthors);
-                if (parsed.length === MAP_WIDTH * MAP_HEIGHT) {
-                    pixelAuthors = parsed;
-                }
-            } catch(e) { }
+            try { pixelAuthors = JSON.parse(savedAuthors); } catch(e) { }
         }
         
         const savedTotal = localStorage.getItem("hubattleTotalPlaced");
         totalPlaced = savedTotal ? parseInt(savedTotal) : 0;
         
-        const savedPlayers = localStorage.getItem("hubattleActivePlayers");
+        // Загружаем онлайн игроков
+        const savedPlayers = localStorage.getItem("hubattleOnlinePlayers");
         if (savedPlayers) {
             try {
                 const parsed = JSON.parse(savedPlayers);
-                activePlayers = new Map(parsed);
                 const now = Date.now();
-                for (let [name, time] of activePlayers) {
-                    if (now - time > 120000) activePlayers.delete(name);
+                for (let [name, data] of parsed) {
+                    if (now - data.lastSeen < 15000) { // активны последние 15 секунд
+                        onlinePlayers.set(name, { lastSeen: data.lastSeen, avatar: data.avatar });
+                    }
                 }
             } catch(e) { }
         }
@@ -470,7 +471,6 @@
                 username: savedUsername,
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(savedUsername.slice(0,2))}`,
             };
-            activePlayers.set(savedUsername, Date.now());
             updateAuthUI();
             startCooldownTimerLoop();
         }
@@ -502,7 +502,7 @@
             }
         }
         
-        // Сетка (только при достаточном зуме)
+        // Сетка при большом зуме
         if (scale > 1.5) {
             ctx.beginPath();
             ctx.strokeStyle = "#00000030";
@@ -525,12 +525,11 @@
         const canvasWidth = MAP_WIDTH * BASE_PIXEL_SIZE * scale;
         const canvasHeight = MAP_HEIGHT * BASE_PIXEL_SIZE * scale;
         
-        // Центрируем canvas в контейнере
-        const centerX = (containerRect.width - canvasWidth) / 2;
-        const centerY = (containerRect.height - canvasHeight) / 2;
+        canvasCenterX = (containerRect.width - canvasWidth) / 2;
+        canvasCenterY = (containerRect.height - canvasHeight) / 2;
         
-        canvas.style.left = `${centerX + offsetX}px`;
-        canvas.style.top = `${centerY + offsetY}px`;
+        canvas.style.left = `${canvasCenterX + offsetX}px`;
+        canvas.style.top = `${canvasCenterY + offsetY}px`;
         canvas.style.position = 'absolute';
     }
     
@@ -541,7 +540,6 @@
         const canvasWidth = MAP_WIDTH * BASE_PIXEL_SIZE * scale;
         const canvasHeight = MAP_HEIGHT * BASE_PIXEL_SIZE * scale;
         
-        // Ограничиваем смещение
         const maxOffsetX = Math.max(0, canvasWidth - containerRect.width) / 2;
         const maxOffsetY = Math.max(0, canvasHeight - containerRect.height) / 2;
         
@@ -552,6 +550,7 @@
         drawCanvas();
     }
     
+    // ========== УЛУЧШЕННЫЙ ЗУМ ПОД КУРСОР ==========
     function zoomAtPoint(delta, clientX, clientY) {
         if (!canvas || !container) return;
         
@@ -560,25 +559,27 @@
         newScale = Math.min(5, Math.max(0.5, newScale));
         if (newScale === scale) return;
         
+        // Получаем координаты мыши относительно контейнера
         const containerRect = container.getBoundingClientRect();
+        const mouseX = clientX - containerRect.left;
+        const mouseY = clientY - containerRect.top;
+        
+        // Координаты мыши в мире canvas до зума
         const canvasRect = canvas.getBoundingClientRect();
+        const canvasMouseX = (mouseX - canvasRect.left) / oldScale;
+        const canvasMouseY = (mouseY - canvasRect.top) / oldScale;
         
-        // Координаты мыши относительно canvas (до зумирования)
-        const mouseX = clientX - canvasRect.left;
-        const mouseY = clientY - canvasRect.top;
-        
-        // Координаты в мире пикселей
-        const worldX = mouseX / oldScale;
-        const worldY = mouseY / oldScale;
-        
+        // Меняем масштаб
         scale = newScale;
         
-        // Новая позиция после зумирования
-        const newMouseX = worldX * scale;
-        const newMouseY = worldY * scale;
+        // Пересчитываем смещение так, чтобы точка под курсором осталась на месте
+        const newCanvasRect = canvas.getBoundingClientRect();
+        const newCanvasLeft = canvasCenterX + offsetX;
+        const newCanvasTop = canvasCenterY + offsetY;
         
-        offsetX += (mouseX - newMouseX) / scale;
-        offsetY += (mouseY - newMouseY) / scale;
+        // Корректируем смещение
+        offsetX = mouseX - canvasMouseX * scale - canvasCenterX;
+        offsetY = mouseY - canvasMouseY * scale - canvasCenterY;
         
         clampAndCenter();
     }
@@ -590,13 +591,12 @@
         clampAndCenter();
     }
     
-    // ========== ИДЕАЛЬНОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ==========
+    // ========== ТОЧНОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ==========
     function getPixelIndexFromClick(clientX, clientY) {
         if (!canvas || !container) return -1;
         
         const canvasRect = canvas.getBoundingClientRect();
         
-        // Координаты относительно canvas
         const relativeX = clientX - canvasRect.left;
         const relativeY = clientY - canvasRect.top;
         
@@ -604,7 +604,6 @@
             return -1;
         }
         
-        // Переводим в координаты виртуального canvas (учитывая масштаб)
         const canvasX = relativeX / scale;
         const canvasY = relativeY / scale;
         
@@ -619,6 +618,7 @@
     
     // ========== МУЛЬТИПЛЕЕР: СИНХРОНИЗАЦИЯ ==========
     function syncWithOtherTabs() {
+        // Синхронизируем карту
         const savedMap = localStorage.getItem("hubattleMap");
         if (savedMap) {
             try {
@@ -631,36 +631,80 @@
                             changed = true;
                         }
                     }
-                    if (changed) drawCanvas();
+                    if (changed) {
+                        drawCanvas();
+                        console.log("Карта синхронизирована");
+                    }
                 }
             } catch(e) { }
         }
         
+        // Синхронизируем авторов
         const savedAuthors = localStorage.getItem("hubattleAuthors");
         if (savedAuthors) {
             try { pixelAuthors = JSON.parse(savedAuthors); } catch(e) { }
         }
         
+        // Синхронизируем общее количество
         const savedTotal = localStorage.getItem("hubattleTotalPlaced");
         if (savedTotal) {
             totalPlaced = parseInt(savedTotal) || 0;
             updateStats();
         }
         
-        const savedPlayers = localStorage.getItem("hubattleActivePlayers");
+        // Синхронизируем онлайн игроков
+        const savedPlayers = localStorage.getItem("hubattleOnlinePlayers");
         if (savedPlayers) {
             try {
                 const parsed = JSON.parse(savedPlayers);
-                const newPlayers = new Map(parsed);
                 const now = Date.now();
-                for (let [name, time] of newPlayers) {
-                    if (now - time < 120000 && name !== currentUser?.username) {
-                        activePlayers.set(name, time);
+                let updated = false;
+                for (let [name, data] of parsed) {
+                    if (now - data.lastSeen < 15000) {
+                        if (!onlinePlayers.has(name)) {
+                            onlinePlayers.set(name, { lastSeen: data.lastSeen, avatar: data.avatar });
+                            updated = true;
+                        }
                     }
                 }
-                updatePlayersList();
+                if (updated) {
+                    updatePlayersList();
+                    console.log("Список игроков обновлен");
+                }
             } catch(e) { }
         }
+    }
+    
+    // ========== HEARTBEAT (сердцебиение игрока) ==========
+    function startHeartbeat() {
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        
+        heartbeatInterval = setInterval(() => {
+            if (currentUser) {
+                // Обновляем время последнего появления
+                onlinePlayers.set(currentUser.username, {
+                    lastSeen: Date.now(),
+                    avatar: currentUser.avatar
+                });
+                
+                // Удаляем неактивных (не было активности 15 секунд)
+                const now = Date.now();
+                let changed = false;
+                for (let [name, data] of onlinePlayers) {
+                    if (now - data.lastSeen > 15000 && name !== currentUser?.username) {
+                        onlinePlayers.delete(name);
+                        changed = true;
+                    }
+                }
+                
+                if (changed) updatePlayersList();
+                
+                // Сохраняем в localStorage
+                const playersData = Array.from(onlinePlayers.entries()).map(([name, data]) => [name, { lastSeen: data.lastSeen, avatar: data.avatar }]);
+                localStorage.setItem("hubattleOnlinePlayers", JSON.stringify(playersData));
+                localStorage.setItem("hubattleLastUpdate", Date.now().toString());
+            }
+        }, 3000); // Каждые 3 секунды отправляем heartbeat
     }
     
     // ========== ЗВУК ==========
@@ -746,7 +790,11 @@
         pixelAuthors[index] = username;
         userCooldowns.set(username, Date.now());
         totalPlaced++;
-        activePlayers.set(username, Date.now());
+        
+        // Обновляем активность
+        if (onlinePlayers.has(username)) {
+            onlinePlayers.get(username).lastSeen = Date.now();
+        }
         
         drawCanvas();
         updateStats();
@@ -774,28 +822,40 @@
         if (!playersPanel) return;
         
         const now = Date.now();
-        for (let [name, time] of activePlayers) {
-            if (now - time > 120000 && name !== currentUser?.username) {
-                activePlayers.delete(name);
+        
+        // Очищаем неактивных
+        for (let [name, data] of onlinePlayers) {
+            if (now - data.lastSeen > 15000 && name !== currentUser?.username) {
+                onlinePlayers.delete(name);
             }
         }
         
-        if (currentUser) activePlayers.set(currentUser.username, now);
-        
-        for (let [name, time] of userCooldowns) {
-            if (now - time < 60000) activePlayers.set(name, now);
+        // Добавляем текущего если его нет
+        if (currentUser && !onlinePlayers.has(currentUser.username)) {
+            onlinePlayers.set(currentUser.username, {
+                lastSeen: now,
+                avatar: currentUser.avatar
+            });
         }
         
-        const playersList = Array.from(activePlayers.keys()).filter(p => p).sort();
+        const playersList = Array.from(onlinePlayers.keys()).sort();
+        const count = playersList.length;
         
-        if (playersList.length === 0) {
+        if (count === 0) {
             playersPanel.innerHTML = "👥 ожидание игроков...";
         } else {
-            playersPanel.innerHTML = `👥 игроки (${playersList.length}): ${playersList.join(", ")}`;
+            const playerNames = playersList.map(name => {
+                if (name === currentUser?.username) return `⭐${name}⭐`;
+                return name;
+            }).join(", ");
+            playersPanel.innerHTML = `👥 онлайн (${count}): ${playerNames}`;
         }
         
-        if (playersCountSpan) playersCountSpan.innerText = playersList.length;
-        localStorage.setItem("hubattleActivePlayers", JSON.stringify(Array.from(activePlayers.entries())));
+        if (playersCountSpan) playersCountSpan.innerText = count;
+        
+        // Сохраняем в localStorage
+        const playersData = Array.from(onlinePlayers.entries()).map(([name, data]) => [name, { lastSeen: data.lastSeen, avatar: data.avatar }]);
+        localStorage.setItem("hubattleOnlinePlayers", JSON.stringify(playersData));
     }
     
     // ========== АВТЕНТИФИКАЦИЯ ==========
@@ -805,7 +865,7 @@
         modal.innerHTML = `
             <div class="modal-content">
                 <h3>🔥 Вход в HuBattle</h3>
-                <input type="text" id="nicknameInput" placeholder="Введите никнейм" maxlength="20" autocomplete="off">
+                <input type="text" id="nicknameInput" placeholder="Введите ваш никнейм" maxlength="20" autocomplete="off">
                 <button id="confirmAuthBtn">⚡ Войти</button>
             </div>
         `;
@@ -817,18 +877,25 @@
         
         const doAuth = () => {
             let nickname = input.value.trim();
-            if (!nickname) nickname = "Воин_" + Math.floor(Math.random() * 1000);
+            if (!nickname) nickname = "Гость_" + Math.floor(Math.random() * 1000);
             
             currentUser = {
                 username: nickname,
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`,
             };
-            activePlayers.set(nickname, Date.now());
+            
+            // Добавляем игрока
+            onlinePlayers.set(nickname, {
+                lastSeen: Date.now(),
+                avatar: currentUser.avatar
+            });
+            
             saveToLocal();
             updateAuthUI();
             showMessage(`✨ Добро пожаловать, ${nickname}!`, 2000);
             updateCooldownUI();
             startCooldownTimerLoop();
+            startHeartbeat();
             updatePlayersList();
             modal.remove();
         };
@@ -838,7 +905,9 @@
     }
     
     function logout() {
-        if (currentUser) activePlayers.delete(currentUser.username);
+        if (currentUser) {
+            onlinePlayers.delete(currentUser.username);
+        }
         currentUser = null;
         localStorage.removeItem("hubattleUsername");
         updateAuthUI();
@@ -870,7 +939,7 @@
     
     function escapeHtml(str) { return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
     function updateStats() { if (totalPixelsSpan) totalPixelsSpan.innerText = totalPlaced; }
-    function showMessage(msg, duration) { if (!messageDiv) return; messageDiv.innerHTML = `💬 ${msg}`; setTimeout(() => { if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | зум колёсиком | реальные игроки`; }, duration); }
+    function showMessage(msg, duration) { if (!messageDiv) return; messageDiv.innerHTML = `💬 ${msg}`; setTimeout(() => { if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | зум под курсор | ${onlinePlayers.size} игроков онлайн`; }, duration); }
     
     function buildPalette() {
         if (!colorPaletteDiv) return;
@@ -960,20 +1029,32 @@
         });
         
         updateAuthUI();
-        if (currentUser) startCooldownTimerLoop();
+        if (currentUser) {
+            startCooldownTimerLoop();
+            startHeartbeat();
+        }
         
-        window.addEventListener('storage', () => syncWithOtherTabs());
+        // Слушаем изменения в localStorage
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'hubattleMap' || e.key === 'hubattleOnlinePlayers' || e.key === 'hubattleLastUpdate') {
+                syncWithOtherTabs();
+            }
+        });
         
+        // Обновляем список игроков каждые 2 секунды
         setInterval(() => updatePlayersList(), 2000);
-        setInterval(() => syncWithOtherTabs(), 1000);
         
-        window.addEventListener('resize', () => clampAndCenter());
+        window.addEventListener('resize', () => {
+            setTimeout(() => clampAndCenter(), 100);
+        });
         
         document.body.addEventListener("click", () => {
             if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
         }, { once: true });
         
         setTimeout(() => clampAndCenter(), 100);
+        
+        console.log("HuBattle запущен! Мультиплеер активен.");
     }
     
     init();
