@@ -5,44 +5,307 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>HuBattle — Битва за Ху Гарден</title>
     <style>
-        /* (все стили остаются без изменений, как в вашем коде) */
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body { background: #0a0c14; font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
-        .battle-fullscreen { display: flex; flex-direction: column; height: 100vh; width: 100%; background: #0a0c14; }
-        .top-bar { background: rgba(10, 14, 24, 0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 107, 107, 0.3); padding: 6px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; z-index: 100; flex-shrink: 0; }
-        .logo h1 { font-size: 1.4rem; background: linear-gradient(135deg, #ff6b6b, #ff8e53); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .logo p { font-size: 0.7rem; color: #ffaa88; }
-        .auth-widget { background: #1e1f2e; padding: 4px 14px; border-radius: 40px; display: flex; align-items: center; gap: 12px; }
-        .user-info { display: flex; align-items: center; gap: 8px; }
-        .avatar { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #ff6b6b; object-fit: cover; }
-        .username { font-weight: bold; color: #ffffff; font-size: 0.85rem; }
-        .logout-btn, .login-btn { background: none; border: none; cursor: pointer; font-size: 0.7rem; padding: 4px 8px; border-radius: 30px; transition: 0.2s; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: #0a0c14;
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .battle-fullscreen {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+            background: #0a0c14;
+        }
+
+        .top-bar {
+            background: rgba(10, 14, 24, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 107, 107, 0.3);
+            padding: 6px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .logo h1 {
+            font-size: 1.4rem;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .logo p {
+            font-size: 0.7rem;
+            color: #ffaa88;
+        }
+
+        .auth-widget {
+            background: #1e1f2e;
+            padding: 4px 14px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid #ff6b6b;
+            object-fit: cover;
+        }
+
+        .username {
+            font-weight: bold;
+            color: #ffffff;
+            font-size: 0.85rem;
+        }
+
+        .logout-btn, .login-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 30px;
+            transition: 0.2s;
+        }
+
         .logout-btn { color: #ff9e8c; }
         .logout-btn:hover { background: rgba(255, 80, 80, 0.2); }
-        .login-btn { background: #ff6b6b; color: white; font-weight: bold; }
+
+        .login-btn {
+            background: #ff6b6b;
+            color: white;
+            font-weight: bold;
+        }
         .login-btn:hover { background: #ff8e53; }
-        .toolbar { background: rgba(18, 22, 35, 0.95); backdrop-filter: blur(8px); padding: 6px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid rgba(255, 107, 107, 0.2); flex-shrink: 0; }
-        .palette { display: flex; gap: 5px; flex-wrap: wrap; max-width: 500px; }
-        .color-option { width: 32px; height: 32px; border-radius: 6px; cursor: pointer; transition: all 0.1s ease; border: 2px solid transparent; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-        .color-option.active { transform: scale(1.08); border: 2px solid white; box-shadow: 0 0 0 2px #ff6b6b; }
-        .selected-info { display: flex; align-items: center; gap: 8px; background: rgba(0, 0, 0, 0.5); padding: 4px 12px; border-radius: 30px; }
-        .preview-color { width: 28px; height: 28px; border-radius: 6px; border: 1px solid white; }
-        .cooldown-indicator { background: #1e1f2e; padding: 4px 14px; border-radius: 40px; font-family: monospace; font-weight: bold; font-size: 0.85rem; color: white; }
-        .reset-btn { background: #2a2f42; border: none; padding: 4px 12px; border-radius: 30px; color: #ffb347; cursor: pointer; font-size: 0.7rem; }
-        .stats { display: flex; gap: 12px; font-size: 0.75rem; color: white; }
-        .canvas-container { flex: 1; position: relative; overflow: hidden; background: #05070c; cursor: crosshair; }
-        #battleCanvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); image-rendering: crisp-edges; image-rendering: pixelated; cursor: crosshair; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        .message-area { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(12px); padding: 6px 16px; border-radius: 40px; font-size: 0.75rem; color: white; pointer-events: none; z-index: 200; white-space: nowrap; border: 1px solid rgba(255, 107, 107, 0.3); }
-        .players-panel { position: fixed; bottom: 15px; left: 15px; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); padding: 8px 15px; border-radius: 20px; font-size: 0.75rem; color: #ffaa88; font-family: monospace; max-width: 400px; z-index: 200; pointer-events: none; overflow-x: auto; white-space: nowrap; }
-        .zoom-controls { position: fixed; bottom: 15px; right: 15px; display: flex; gap: 8px; z-index: 200; }
-        .zoom-btn { background: #1e1f2e; border: none; width: 36px; height: 36px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; color: white; cursor: pointer; backdrop-filter: blur(4px); box-shadow: 0 2px 8px black; }
-        .zoom-btn:hover { background: #ff6b6b; }
-        .nickname-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #1e2438; border-radius: 28px; padding: 25px; width: 320px; text-align: center; border: 1px solid #ff6b6b; }
+
+        .toolbar {
+            background: rgba(18, 22, 35, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 6px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255, 107, 107, 0.2);
+            flex-shrink: 0;
+        }
+
+        .palette {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            max-width: 500px;
+        }
+
+        .color-option {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            border: 2px solid transparent;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .color-option.active {
+            transform: scale(1.08);
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px #ff6b6b;
+        }
+
+        .selected-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 4px 12px;
+            border-radius: 30px;
+        }
+
+        .preview-color {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid white;
+        }
+
+        .cooldown-indicator {
+            background: #1e1f2e;
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 0.85rem;
+            color: white;
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            font-size: 0.75rem;
+            color: white;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #05070c;
+            cursor: crosshair;
+        }
+
+        #battleCanvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+            cursor: crosshair;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .message-area {
+            position: fixed;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            color: white;
+            pointer-events: none;
+            z-index: 200;
+            white-space: nowrap;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        .players-panel {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: #ffaa88;
+            font-family: monospace;
+            max-width: 400px;
+            z-index: 200;
+            pointer-events: none;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .zoom-controls {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+            z-index: 200;
+        }
+
+        .zoom-btn {
+            background: #1e1f2e;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 2px 8px black;
+        }
+
+        .zoom-btn:hover {
+            background: #ff6b6b;
+        }
+
+        .nickname-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #1e2438;
+            border-radius: 28px;
+            padding: 25px;
+            width: 320px;
+            text-align: center;
+            border: 1px solid #ff6b6b;
+        }
+
         .modal-content h3 { color: white; margin-bottom: 20px; }
-        .modal-content input { width: 100%; padding: 10px; border-radius: 50px; border: none; background: #2d2f3e; color: white; font-size: 1rem; text-align: center; margin-bottom: 20px; outline: none; }
-        .modal-content button { background: #ff6b6b; border: none; padding: 8px 20px; border-radius: 50px; color: white; font-weight: bold; cursor: pointer; width: 100%; }
-        @media (max-width: 900px) { .color-option { width: 28px; height: 28px; } .palette { max-width: 350px; } .players-panel { max-width: 280px; font-size: 0.65rem; } }
+        .modal-content input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 50px;
+            border: none;
+            background: #2d2f3e;
+            color: white;
+            font-size: 1rem;
+            text-align: center;
+            margin-bottom: 20px;
+            outline: none;
+        }
+        .modal-content button {
+            background: #ff6b6b;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 50px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .color-option { width: 28px; height: 28px; }
+            .palette { max-width: 350px; }
+            .players-panel { max-width: 280px; font-size: 0.65rem; }
+        }
     </style>
 </head>
 <body>
@@ -67,7 +330,6 @@
         <div class="stats">
             <span>📊 <span id="totalPixelsCount">0</span></span>
             <span>👥 <span id="playersCount">0</span></span>
-            <button class="reset-btn" id="resetBoardBtn">♻️</button>
         </div>
     </div>
 
@@ -114,6 +376,7 @@
     const MAP_HEIGHT = 60;
     const PIXEL_SIZE = 12;
     const COOLDOWN_SECONDS = 3;
+    const HEARTBEAT_INTERVAL = 5000;   // обновление присутствия каждые 5 сек
 
     const PALETTE = [
         "#FF4444", "#FF8844", "#FFDD44", "#88FF44", "#44FF88",
@@ -142,6 +405,7 @@
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
+    let heartbeatInterval = null;
 
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
@@ -196,11 +460,20 @@
         });
     }
 
-    // ========== ИГРОКИ ОНЛАЙН ==========
+    // ========== ИГРОКИ ОНЛАЙН (С HEARTBEAT) ==========
     function updatePlayerPresence() {
         if (!currentUser) return;
         playersRef.child(currentUser.username).set({ lastSeen: Date.now(), avatar: currentUser.avatar });
         playersRef.child(currentUser.username).onDisconnect().remove();
+    }
+
+    function startHeartbeat() {
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        heartbeatInterval = setInterval(() => {
+            if (currentUser) {
+                updatePlayerPresence();
+            }
+        }, HEARTBEAT_INTERVAL);
     }
 
     function listenForPlayers() {
@@ -242,10 +515,11 @@
                 ctx.fillRect(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE - 0.5, PIXEL_SIZE - 0.5);
             }
         }
-        if (scale > 1.5) {
+        // Нейтральная сетка (светло-серая)
+        if (scale > 1.2) {
             ctx.beginPath();
-            ctx.strokeStyle = "#00000030";
-            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = "#cccccc";
+            ctx.lineWidth = 0.8;
             for (let x = 0; x <= MAP_WIDTH; x++) {
                 ctx.moveTo(x * PIXEL_SIZE, 0);
                 ctx.lineTo(x * PIXEL_SIZE, h);
@@ -281,28 +555,42 @@
         drawCanvas();
     }
 
+    // ========== ИСПРАВЛЕННЫЙ ЗУМ ПОД КУРСОР ==========
     function zoomAtPoint(delta, clientX, clientY) {
         if (!canvas || !container) return;
+
         const oldScale = scale;
         let newScale = scale + delta;
         newScale = Math.min(5, Math.max(0.5, newScale));
         if (newScale === scale) return;
 
-        const containerRect = container.getBoundingClientRect();
-        const mouseX = clientX - containerRect.left;
-        const mouseY = clientY - containerRect.top;
+        // Текущее положение canvas на экране
+        const canvasRect = canvas.getBoundingClientRect();
+        // Координаты мыши относительно canvas (в пикселях экрана)
+        const mouseCanvasX = clientX - canvasRect.left;
+        const mouseCanvasY = clientY - canvasRect.top;
 
-        const canvasLeft = canvasCenterX + offsetX;
-        const canvasTop = canvasCenterY + offsetY;
-        const worldX = (mouseX - canvasLeft) / oldScale;
-        const worldY = (mouseY - canvasTop) / oldScale;
+        if (mouseCanvasX < 0 || mouseCanvasY < 0 || mouseCanvasX > canvasRect.width || mouseCanvasY > canvasRect.height) {
+            // Если мышь вне canvas — зум относительно центра
+            scale = newScale;
+            clampAndCenter();
+            return;
+        }
 
+        // Мировые координаты точки под курсором (до изменения масштаба)
+        const worldX = mouseCanvasX / oldScale;
+        const worldY = mouseCanvasY / oldScale;
+
+        // Меняем масштаб
         scale = newScale;
 
-        const newCanvasLeft = mouseX - worldX * scale;
-        const newCanvasTop = mouseY - worldY * scale;
-        offsetX = newCanvasLeft - canvasCenterX;
-        offsetY = newCanvasTop - canvasCenterY;
+        // После изменения масштаба точка должна остаться под мышью
+        const newMouseCanvasX = worldX * scale;
+        const newMouseCanvasY = worldY * scale;
+
+        // Корректируем смещение так, чтобы точка не сдвинулась
+        offsetX += (mouseCanvasX - newMouseCanvasX) / scale;
+        offsetY += (mouseCanvasY - newMouseCanvasY) / scale;
 
         clampAndCenter();
     }
@@ -453,13 +741,13 @@
                 username: nickname,
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`,
             };
-            // Сохраняем сессию
             localStorage.setItem("hubattle_username", nickname);
             updateAuthUI();
             showMessage(`✨ Добро пожаловать, ${nickname}!`, 2000);
             updateCooldownUI();
             startCooldownTimerLoop();
             updatePlayerPresence();
+            startHeartbeat();
             modal.remove();
         };
         confirmBtn.addEventListener('click', doAuth);
@@ -475,6 +763,8 @@
         updateAuthUI();
         if (cooldownInterval) clearInterval(cooldownInterval);
         cooldownInterval = null;
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
         if (cooldownSpan) cooldownSpan.innerText = "войдите";
         showMessage("👋 Вы вышли", 1000);
     }
@@ -575,16 +865,6 @@
         document.getElementById("zoomInBtn")?.addEventListener("click", () => zoomAtPoint(0.2, container.clientWidth/2, container.clientHeight/2));
         document.getElementById("zoomOutBtn")?.addEventListener("click", () => zoomAtPoint(-0.2, container.clientWidth/2, container.clientHeight/2));
         document.getElementById("resetViewBtn")?.addEventListener("click", resetView);
-        document.getElementById("resetBoardBtn")?.addEventListener("click", () => {
-            if (confirm("Сбросить всё поле? Все пиксели станут белыми!")) {
-                initMap();
-                totalPlaced = 0;
-                saveMapToFirebase();
-                drawCanvas();
-                updateStats();
-                showMessage("Поле очищено!", 1500);
-            }
-        });
 
         // Восстанавливаем сессию
         const savedUsername = localStorage.getItem("hubattle_username");
@@ -597,6 +877,7 @@
             updateCooldownUI();
             startCooldownTimerLoop();
             updatePlayerPresence();
+            startHeartbeat();
         } else {
             updateAuthUI();
         }
