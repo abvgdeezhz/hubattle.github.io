@@ -438,11 +438,9 @@
         updateStats();
     }
     
-    // ========== МУЛЬТИПЛЕЕР: ИГРОКИ ==========
-    // Структура: localStorage.hubattle_players = { "ник1": метка_времени, "ник2": метка_времени, ... }
+    // ========== МУЛЬТИПЛЕЕР: ИГРОКИ (ЛОКАЛЬНЫЙ, ТОЛЬКО ДЛЯ РАЗНЫХ ВКЛАДОК) ==========
     function updatePlayerPresence() {
         if (!currentUser) return;
-        
         const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
         players[currentUser.username] = Date.now();
         localStorage.setItem("hubattle_players", JSON.stringify(players));
@@ -473,7 +471,6 @@
         if (playersCountSpan) playersCountSpan.innerText = count;
     }
     
-    // Очистка старых игроков (вызывается периодически)
     function cleanOldPlayers() {
         const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
         const now = Date.now();
@@ -506,7 +503,6 @@
                     }
                     if (changed) {
                         drawCanvas();
-                        console.log("Карта синхронизирована");
                     }
                 }
             } catch(e) { }
@@ -585,7 +581,7 @@
         drawCanvas();
     }
     
-    // ========== ЗУМ ПОД КУРСОР (идеально) ==========
+    // ========== ИСПРАВЛЕННЫЙ ЗУМ ПОД КУРСОР ==========
     function zoomAtPoint(delta, clientX, clientY) {
         if (!canvas || !container) return;
         
@@ -594,31 +590,32 @@
         newScale = Math.min(5, Math.max(0.5, newScale));
         if (newScale === scale) return;
         
-        // Координаты мыши относительно контейнера
+        // Получаем координаты мыши относительно контейнера
         const containerRect = container.getBoundingClientRect();
         const mouseX = clientX - containerRect.left;
         const mouseY = clientY - containerRect.top;
         
-        // Координаты мыши в мировых координатах холста (до масштабирования)
+        // Получаем текущее положение canvas (до изменения масштаба)
         const canvasRect = canvas.getBoundingClientRect();
-        const worldX = (mouseX - canvasRect.left) / scale;
-        const worldY = (mouseY - canvasRect.top) / scale;
         
+        // Координаты мыши в мировых координатах холста (до масштабирования)
+        // Используем текущий масштаб и смещение
+        // Для этого нужно вычислить, какая точка холста находится под мышью.
+        // Учитываем, что canvas позиционирован с учетом canvasCenterX и offsetX
+        const canvasLeft = canvasCenterX + offsetX;
+        const canvasTop = canvasCenterY + offsetY;
+        const worldX = (mouseX - canvasLeft) / oldScale;
+        const worldY = (mouseY - canvasTop) / oldScale;
+        
+        // Меняем масштаб
         scale = newScale;
         
-        // После изменения масштаба, пересчитываем смещение, чтобы точка под курсором осталась на месте
-        const newCanvasRect = canvas.getBoundingClientRect(); // временно, но offsetX/offsetY ещё не обновлены
-        // Мы пересчитаем offset напрямую
-        const targetCanvasX = worldX * scale;
-        const targetCanvasY = worldY * scale;
+        // Пересчитываем смещение так, чтобы мировая точка (worldX, worldY) осталась под мышью
+        const newCanvasLeft = mouseX - worldX * scale;
+        const newCanvasTop = mouseY - worldY * scale;
         
-        // Желаемое положение левого верхнего угла canvas в контейнере после масштабирования
-        const newLeft = mouseX - targetCanvasX;
-        const newTop = mouseY - targetCanvasY;
-        
-        // Пересчитываем offset относительно центра
-        offsetX = newLeft - canvasCenterX;
-        offsetY = newTop - canvasCenterY;
+        offsetX = newCanvasLeft - canvasCenterX;
+        offsetY = newCanvasTop - canvasCenterY;
         
         clampAndCenter();
     }
@@ -734,8 +731,8 @@
         drawCanvas();
         updateStats();
         updateCooldownUI();
-        saveMapToLocal();          // сохраняем карту
-        updatePlayerPresence();    // обновляем время присутствия
+        saveMapToLocal();
+        updatePlayerPresence();
         
         showMessage(`🎨 ${username} поставил пиксель (${row},${col})!`, 800);
         return true;
@@ -778,7 +775,7 @@
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`,
             };
             
-            // Регистрируем игрока
+            localStorage.setItem("hubattle_username", nickname);
             updatePlayerPresence();
             updateAuthUI();
             showMessage(`✨ Добро пожаловать, ${nickname}!`, 2000);
@@ -794,7 +791,6 @@
     
     function logout() {
         if (currentUser) {
-            // Удаляем игрока из списка
             const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
             delete players[currentUser.username];
             localStorage.setItem("hubattle_players", JSON.stringify(players));
@@ -889,8 +885,8 @@
             if (currentUser) {
                 updatePlayerPresence();
             }
-            cleanOldPlayers();   // удаляем старых игроков и обновляем UI
-            syncCanvasFromStorage(); // синхронизируем карту
+            cleanOldPlayers();
+            syncCanvasFromStorage();
         }, 2000);
     }
     
@@ -929,7 +925,7 @@
             }
         });
         
-        // Восстанавливаем сессию, если была
+        // Восстанавливаем сессию
         const savedUsername = localStorage.getItem("hubattle_username");
         if (savedUsername && !currentUser) {
             currentUser = {
@@ -944,10 +940,8 @@
         updateAuthUI();
         if (currentUser) startCooldownTimerLoop();
         
-        // Запускаем heartbeat и синхронизацию
         startHeartbeat();
         
-        // Слушаем изменения в localStorage для моментальной синхронизации
         window.addEventListener('storage', (e) => {
             if (e.key === 'hubattle_map' || e.key === 'hubattle_total') {
                 syncCanvasFromStorage();
@@ -967,11 +961,8 @@
         
         setTimeout(() => clampAndCenter(), 100);
         updatePlayersUI();
-        
-        console.log("HuBattle запущен. Мультиплеер активен.");
     }
     
-    // Сохраняем ник при входе
     window.addEventListener('beforeunload', () => {
         if (currentUser) {
             const players = JSON.parse(localStorage.getItem("hubattle_players") || "{}");
