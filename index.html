@@ -121,12 +121,12 @@
             display: flex;
             gap: 5px;
             flex-wrap: wrap;
-            max-width: 450px;
+            max-width: 500px;
         }
 
         .color-option {
-            width: 30px;
-            height: 30px;
+            width: 32px;
+            height: 32px;
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.1s ease;
@@ -193,11 +193,13 @@
 
         #battleCanvas {
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             image-rendering: crisp-edges;
             image-rendering: pixelated;
             cursor: crosshair;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
 
         .message-area {
@@ -228,11 +230,38 @@
             font-size: 0.7rem;
             color: #ffaa88;
             font-family: monospace;
-            max-width: 280px;
+            max-width: 300px;
             z-index: 200;
             pointer-events: none;
             white-space: nowrap;
             overflow-x: auto;
+        }
+
+        .zoom-controls {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+            z-index: 200;
+        }
+
+        .zoom-btn {
+            background: #1e1f2e;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 2px 8px black;
+        }
+
+        .zoom-btn:hover {
+            background: #ff6b6b;
         }
 
         .nickname-modal {
@@ -283,10 +312,9 @@
         }
 
         @media (max-width: 900px) {
-            .color-option { width: 26px; height: 26px; }
-            .palette { max-width: 300px; }
-            .stats { font-size: 0.65rem; }
-            .players-panel { font-size: 0.6rem; max-width: 180px; }
+            .color-option { width: 28px; height: 28px; }
+            .palette { max-width: 350px; }
+            .players-panel { max-width: 220px; font-size: 0.6rem; }
         }
     </style>
 </head>
@@ -295,7 +323,7 @@
     <div class="top-bar">
         <div class="logo">
             <h1>🔥 HUBATTLE 🔥</h1>
-            <p>мультиплеер | реальные игроки | кулдаун 3 сек</p>
+            <p>100x60 | мультиплеер | зум колесиком | кулдаун 3 сек</p>
         </div>
         <div class="auth-widget" id="authWidget"></div>
     </div>
@@ -319,20 +347,24 @@
     <div class="canvas-container" id="canvasContainer">
         <canvas id="battleCanvas"></canvas>
     </div>
+    <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomOutBtn">−</button>
+        <button class="zoom-btn" id="zoomInBtn">+</button>
+        <button class="zoom-btn" id="resetViewBtn">⌗</button>
+    </div>
     <div class="players-panel" id="playersPanel">
         👥 загрузка...
     </div>
     <div class="message-area" id="globalMessage">
-        🔥 Нажми "Войти" → ставь пиксели | кулдаун 3 сек
+        🔥 Нажми "Войти" → ставь пиксели | кулдаун 3 сек | зум колёсиком
     </div>
 </div>
 
 <script>
-    // ========== КОНФИГУРАЦИЯ ==========
-    // АДАПТИВНЫЙ ХОЛСТ — подстраивается под размер экрана
-    let MAP_WIDTH = 120;
-    let MAP_HEIGHT = 68;
-    let PIXEL_SIZE = 10;
+    // ========== ФИКСИРОВАННЫЙ ХОЛСТ (оптимальный для всех экранов) ==========
+    const MAP_WIDTH = 100;
+    const MAP_HEIGHT = 60;
+    const BASE_PIXEL_SIZE = 12;
     const COOLDOWN_SECONDS = 3;
     
     // РАСШИРЕННАЯ ПАЛИТРА (40 цветов)
@@ -353,12 +385,15 @@
     let totalPlaced = 0;
     let currentUser = null;
     let userCooldowns = new Map();
-    let activePlayers = new Map(); // username -> timestamp последней активности
+    let activePlayers = new Map();
     let selectedColor = PALETTE[0];
     
-    // Canvas
+    // Canvas и трансформации
     let canvas, ctx, container;
+    let scale = 1;
+    let offsetX = 0, offsetY = 0;
     let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
     
     // DOM элементы
     let colorPaletteDiv, previewColorDiv, cooldownSpan, totalPixelsSpan, playersCountSpan, messageDiv, playersPanel;
@@ -367,39 +402,6 @@
     let audioCtx = null;
     let lastCooldownState = 0;
     let cooldownInterval = null;
-    
-    // Синхронизация между вкладками
-    let syncInterval = null;
-    
-    // ========== ИНИЦИАЛИЗАЦИЯ АДАПТИВНОГО ХОЛСТА ==========
-    function calculateOptimalGrid() {
-        const container = document.getElementById('canvasContainer');
-        if (!container) return;
-        
-        const rect = container.getBoundingClientRect();
-        const availableWidth = rect.width;
-        const availableHeight = rect.height;
-        
-        // Оптимальный размер ячейки (8-12 пикселей)
-        let optimalCellSize = 10;
-        
-        // Рассчитываем оптимальное количество ячеек
-        let cols = Math.floor(availableWidth / optimalCellSize);
-        let rows = Math.floor(availableHeight / optimalCellSize);
-        
-        // Ограничиваем минимум и максимум
-        cols = Math.min(Math.max(cols, 80), 200);
-        rows = Math.min(Math.max(rows, 45), 120);
-        
-        // Корректируем размер ячейки под реальные размеры
-        PIXEL_SIZE = Math.floor(Math.min(availableWidth / cols, availableHeight / rows));
-        
-        // Пересчитываем окончательные размеры
-        MAP_WIDTH = cols;
-        MAP_HEIGHT = rows;
-        
-        console.log(`Холст адаптирован: ${MAP_WIDTH}x${MAP_HEIGHT}, ячейка ${PIXEL_SIZE}px`);
-    }
     
     // ========== ИНИЦИАЛИЗАЦИЯ ПОЛЯ ==========
     function initMap() {
@@ -417,7 +419,6 @@
         localStorage.setItem("hubattleTotalPlaced", totalPlaced);
         if (currentUser) {
             localStorage.setItem("hubattleUsername", currentUser.username);
-            // Обновляем активность текущего игрока
             activePlayers.set(currentUser.username, Date.now());
             localStorage.setItem("hubattleActivePlayers", JSON.stringify(Array.from(activePlayers.entries())));
         }
@@ -451,18 +452,14 @@
         const savedTotal = localStorage.getItem("hubattleTotalPlaced");
         totalPlaced = savedTotal ? parseInt(savedTotal) : 0;
         
-        // Загружаем активных игроков
         const savedPlayers = localStorage.getItem("hubattleActivePlayers");
         if (savedPlayers) {
             try {
                 const parsed = JSON.parse(savedPlayers);
                 activePlayers = new Map(parsed);
-                // Очищаем старых игроков (более 2 минут)
                 const now = Date.now();
                 for (let [name, time] of activePlayers) {
-                    if (now - time > 120000) {
-                        activePlayers.delete(name);
-                    }
+                    if (now - time > 120000) activePlayers.delete(name);
                 }
             } catch(e) { }
         }
@@ -486,46 +483,120 @@
     function drawCanvas() {
         if (!canvas || !ctx) return;
         
-        const w = MAP_WIDTH * PIXEL_SIZE;
-        const h = MAP_HEIGHT * PIXEL_SIZE;
+        const w = MAP_WIDTH * BASE_PIXEL_SIZE;
+        const h = MAP_HEIGHT * BASE_PIXEL_SIZE;
         
         canvas.width = w;
         canvas.height = h;
-        canvas.style.width = '100%';
-        canvas.style.height = '100%';
-        canvas.style.objectFit = 'contain';
+        
+        // Применяем трансформацию
+        canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        canvas.style.transformOrigin = "center center";
         
         // Отрисовка пикселей
         for (let row = 0; row < MAP_HEIGHT; row++) {
             for (let col = 0; col < MAP_WIDTH; col++) {
                 const idx = row * MAP_WIDTH + col;
                 ctx.fillStyle = pixelMap[idx];
-                ctx.fillRect(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE - 0.5, PIXEL_SIZE - 0.5);
+                ctx.fillRect(col * BASE_PIXEL_SIZE, row * BASE_PIXEL_SIZE, BASE_PIXEL_SIZE - 0.5, BASE_PIXEL_SIZE - 0.5);
             }
         }
         
-        // Легкая сетка
-        ctx.beginPath();
-        ctx.strokeStyle = "#cccccc30";
-        ctx.lineWidth = 0.5;
-        for (let x = 0; x <= MAP_WIDTH; x++) {
-            ctx.moveTo(x * PIXEL_SIZE, 0);
-            ctx.lineTo(x * PIXEL_SIZE, h);
-            ctx.stroke();
-            ctx.moveTo(0, x * PIXEL_SIZE);
-            ctx.lineTo(w, x * PIXEL_SIZE);
-            ctx.stroke();
+        // Сетка (только при достаточном зуме)
+        if (scale > 1.5) {
+            ctx.beginPath();
+            ctx.strokeStyle = "#00000030";
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x <= MAP_WIDTH; x++) {
+                ctx.moveTo(x * BASE_PIXEL_SIZE, 0);
+                ctx.lineTo(x * BASE_PIXEL_SIZE, h);
+                ctx.stroke();
+                ctx.moveTo(0, x * BASE_PIXEL_SIZE);
+                ctx.lineTo(w, x * BASE_PIXEL_SIZE);
+                ctx.stroke();
+            }
         }
     }
     
-    // ========== ТОЧНОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ (исправлено!) ==========
+    function updateCanvasPosition() {
+        if (!canvas || !container) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const canvasWidth = MAP_WIDTH * BASE_PIXEL_SIZE * scale;
+        const canvasHeight = MAP_HEIGHT * BASE_PIXEL_SIZE * scale;
+        
+        // Центрируем canvas в контейнере
+        const centerX = (containerRect.width - canvasWidth) / 2;
+        const centerY = (containerRect.height - canvasHeight) / 2;
+        
+        canvas.style.left = `${centerX + offsetX}px`;
+        canvas.style.top = `${centerY + offsetY}px`;
+        canvas.style.position = 'absolute';
+    }
+    
+    function clampAndCenter() {
+        if (!canvas || !container) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const canvasWidth = MAP_WIDTH * BASE_PIXEL_SIZE * scale;
+        const canvasHeight = MAP_HEIGHT * BASE_PIXEL_SIZE * scale;
+        
+        // Ограничиваем смещение
+        const maxOffsetX = Math.max(0, canvasWidth - containerRect.width) / 2;
+        const maxOffsetY = Math.max(0, canvasHeight - containerRect.height) / 2;
+        
+        offsetX = Math.min(maxOffsetX, Math.max(-maxOffsetX, offsetX));
+        offsetY = Math.min(maxOffsetY, Math.max(-maxOffsetY, offsetY));
+        
+        updateCanvasPosition();
+        drawCanvas();
+    }
+    
+    function zoomAtPoint(delta, clientX, clientY) {
+        if (!canvas || !container) return;
+        
+        const oldScale = scale;
+        let newScale = scale + delta;
+        newScale = Math.min(5, Math.max(0.5, newScale));
+        if (newScale === scale) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        // Координаты мыши относительно canvas (до зумирования)
+        const mouseX = clientX - canvasRect.left;
+        const mouseY = clientY - canvasRect.top;
+        
+        // Координаты в мире пикселей
+        const worldX = mouseX / oldScale;
+        const worldY = mouseY / oldScale;
+        
+        scale = newScale;
+        
+        // Новая позиция после зумирования
+        const newMouseX = worldX * scale;
+        const newMouseY = worldY * scale;
+        
+        offsetX += (mouseX - newMouseX) / scale;
+        offsetY += (mouseY - newMouseY) / scale;
+        
+        clampAndCenter();
+    }
+    
+    function resetView() {
+        scale = 1;
+        offsetX = 0;
+        offsetY = 0;
+        clampAndCenter();
+    }
+    
+    // ========== ИДЕАЛЬНОЕ ОПРЕДЕЛЕНИЕ ПИКСЕЛЯ ==========
     function getPixelIndexFromClick(clientX, clientY) {
         if (!canvas || !container) return -1;
         
         const canvasRect = canvas.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
         
-        // Координаты клика относительно canvas
+        // Координаты относительно canvas
         const relativeX = clientX - canvasRect.left;
         const relativeY = clientY - canvasRect.top;
         
@@ -533,30 +604,12 @@
             return -1;
         }
         
-        // Масштабирование: canvas отображается с object-fit: contain
-        // Нужно определить масштаб отображения
-        const canvasDisplayWidth = canvasRect.width;
-        const canvasDisplayHeight = canvasRect.height;
-        const canvasRealWidth = MAP_WIDTH * PIXEL_SIZE;
-        const canvasRealHeight = MAP_HEIGHT * PIXEL_SIZE;
+        // Переводим в координаты виртуального canvas (учитывая масштаб)
+        const canvasX = relativeX / scale;
+        const canvasY = relativeY / scale;
         
-        // Вычисляем масштаб отображения
-        const scaleX = canvasDisplayWidth / canvasRealWidth;
-        const scaleY = canvasDisplayHeight / canvasRealHeight;
-        const scale = Math.min(scaleX, scaleY);
-        
-        // Вычисляем смещение для центрирования
-        const offsetX = (canvasDisplayWidth - canvasRealWidth * scale) / 2;
-        const offsetY = (canvasDisplayHeight - canvasRealHeight * scale) / 2;
-        
-        // Координаты в реальном canvas
-        const realX = (relativeX - offsetX) / scale;
-        const realY = (relativeY - offsetY) / scale;
-        
-        if (realX < 0 || realY < 0) return -1;
-        
-        const col = Math.floor(realX / PIXEL_SIZE);
-        const row = Math.floor(realY / PIXEL_SIZE);
+        const col = Math.floor(canvasX / BASE_PIXEL_SIZE);
+        const row = Math.floor(canvasY / BASE_PIXEL_SIZE);
         
         if (col >= 0 && col < MAP_WIDTH && row >= 0 && row < MAP_HEIGHT) {
             return row * MAP_WIDTH + col;
@@ -566,7 +619,6 @@
     
     // ========== МУЛЬТИПЛЕЕР: СИНХРОНИЗАЦИЯ ==========
     function syncWithOtherTabs() {
-        // Загружаем последние данные из localStorage
         const savedMap = localStorage.getItem("hubattleMap");
         if (savedMap) {
             try {
@@ -579,32 +631,22 @@
                             changed = true;
                         }
                     }
-                    if (changed) {
-                        drawCanvas();
-                    }
+                    if (changed) drawCanvas();
                 }
             } catch(e) { }
         }
         
-        // Синхронизируем авторов
         const savedAuthors = localStorage.getItem("hubattleAuthors");
         if (savedAuthors) {
-            try {
-                const parsed = JSON.parse(savedAuthors);
-                if (parsed.length === MAP_WIDTH * MAP_HEIGHT) {
-                    pixelAuthors = parsed;
-                }
-            } catch(e) { }
+            try { pixelAuthors = JSON.parse(savedAuthors); } catch(e) { }
         }
         
-        // Синхронизируем общее количество
         const savedTotal = localStorage.getItem("hubattleTotalPlaced");
         if (savedTotal) {
             totalPlaced = parseInt(savedTotal) || 0;
             updateStats();
         }
         
-        // Синхронизируем активных игроков
         const savedPlayers = localStorage.getItem("hubattleActivePlayers");
         if (savedPlayers) {
             try {
@@ -612,10 +654,8 @@
                 const newPlayers = new Map(parsed);
                 const now = Date.now();
                 for (let [name, time] of newPlayers) {
-                    if (now - time < 120000) {
-                        if (!activePlayers.has(name) && name !== currentUser?.username) {
-                            activePlayers.set(name, time);
-                        }
+                    if (now - time < 120000 && name !== currentUser?.username) {
+                        activePlayers.set(name, time);
                     }
                 }
                 updatePlayersList();
@@ -623,19 +663,10 @@
         }
     }
     
-    function broadcastChange(index, color, username) {
-        // Сохраняем в localStorage для других вкладок
-        saveToLocal();
-        // Принудительно обновляем других
-        localStorage.setItem("hubattle_lastUpdate", Date.now().toString());
-    }
-    
     // ========== ЗВУК ==========
     function playCooldownEndSound() {
         try {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const now = audioCtx.currentTime;
             const osc = audioCtx.createOscillator();
@@ -715,14 +746,12 @@
         pixelAuthors[index] = username;
         userCooldowns.set(username, Date.now());
         totalPlaced++;
-        
-        // Обновляем активность игрока
         activePlayers.set(username, Date.now());
         
         drawCanvas();
         updateStats();
         updateCooldownUI();
-        broadcastChange(index, colorHex, username);
+        saveToLocal();
         
         showMessage(`🎨 ${username} поставил пиксель (${row},${col})!`, 800);
         updatePlayersList();
@@ -745,23 +774,16 @@
         if (!playersPanel) return;
         
         const now = Date.now();
-        // Очищаем старых игроков (неактивны более 2 минут)
         for (let [name, time] of activePlayers) {
             if (now - time > 120000 && name !== currentUser?.username) {
                 activePlayers.delete(name);
             }
         }
         
-        // Обновляем активность текущего игрока
-        if (currentUser) {
-            activePlayers.set(currentUser.username, now);
-        }
+        if (currentUser) activePlayers.set(currentUser.username, now);
         
-        // Добавляем игроков из кулдаунов
         for (let [name, time] of userCooldowns) {
-            if (now - time < 60000) {
-                activePlayers.set(name, now);
-            }
+            if (now - time < 60000) activePlayers.set(name, now);
         }
         
         const playersList = Array.from(activePlayers.keys()).filter(p => p).sort();
@@ -773,8 +795,6 @@
         }
         
         if (playersCountSpan) playersCountSpan.innerText = playersList.length;
-        
-        // Сохраняем в localStorage для других вкладок
         localStorage.setItem("hubattleActivePlayers", JSON.stringify(Array.from(activePlayers.entries())));
     }
     
@@ -848,9 +868,9 @@
         }
     }
     
-    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m) { return m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'; }); }
+    function escapeHtml(str) { return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
     function updateStats() { if (totalPixelsSpan) totalPixelsSpan.innerText = totalPlaced; }
-    function showMessage(msg, duration) { if (!messageDiv) return; messageDiv.innerHTML = `💬 ${msg}`; setTimeout(() => { if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | реальные игроки`; }, duration); }
+    function showMessage(msg, duration) { if (!messageDiv) return; messageDiv.innerHTML = `💬 ${msg}`; setTimeout(() => { if (messageDiv) messageDiv.innerHTML = `🔥 HuBattle | кулдаун ${COOLDOWN_SECONDS} сек | зум колёсиком | реальные игроки`; }, duration); }
     
     function buildPalette() {
         if (!colorPaletteDiv) return;
@@ -871,10 +891,36 @@
         if (previewColorDiv) previewColorDiv.style.backgroundColor = selectedColor;
     }
     
-    function handleResize() {
-        calculateOptimalGrid();
-        loadFromLocal();
-        drawCanvas();
+    function setupPanAndZoom() {
+        if (!container) return;
+        
+        container.addEventListener("mousedown", (e) => {
+            if (e.target === canvas || container.contains(e.target)) {
+                isDragging = true;
+                dragStart.x = e.clientX - offsetX;
+                dragStart.y = e.clientY - offsetY;
+                container.style.cursor = "grabbing";
+                e.preventDefault();
+            }
+        });
+        
+        window.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+            offsetX = e.clientX - dragStart.x;
+            offsetY = e.clientY - dragStart.y;
+            clampAndCenter();
+        });
+        
+        window.addEventListener("mouseup", () => {
+            isDragging = false;
+            container.style.cursor = "crosshair";
+        });
+        
+        container.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoomAtPoint(delta, e.clientX, e.clientY);
+        });
     }
     
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
@@ -890,54 +936,44 @@
         messageDiv = document.getElementById("globalMessage");
         playersPanel = document.getElementById("playersPanel");
         
-        calculateOptimalGrid();
+        initMap();
         loadFromLocal();
         drawCanvas();
         buildPalette();
+        setupPanAndZoom();
         
         canvas.addEventListener("click", onCanvasClick);
         
-        const resetBoardBtn = document.getElementById("resetBoardBtn");
-        if (resetBoardBtn) {
-            resetBoardBtn.addEventListener("click", () => {
-                if (confirm("Сбросить всё поле?")) {
-                    initMap();
-                    totalPlaced = 0;
-                    saveToLocal();
-                    drawCanvas();
-                    updateStats();
-                    showMessage("Поле очищено!", 1500);
-                }
-            });
-        }
+        document.getElementById("zoomInBtn")?.addEventListener("click", () => zoomAtPoint(0.2, container.clientWidth/2, container.clientHeight/2));
+        document.getElementById("zoomOutBtn")?.addEventListener("click", () => zoomAtPoint(-0.2, container.clientWidth/2, container.clientHeight/2));
+        document.getElementById("resetViewBtn")?.addEventListener("click", resetView);
+        
+        document.getElementById("resetBoardBtn")?.addEventListener("click", () => {
+            if (confirm("Сбросить всё поле?")) {
+                initMap();
+                totalPlaced = 0;
+                saveToLocal();
+                drawCanvas();
+                updateStats();
+                showMessage("Поле очищено!", 1500);
+            }
+        });
         
         updateAuthUI();
         if (currentUser) startCooldownTimerLoop();
         
-        // Синхронизация между вкладками
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'hubattleMap' || e.key === 'hubattle_lastUpdate') {
-                syncWithOtherTabs();
-            }
-        });
+        window.addEventListener('storage', () => syncWithOtherTabs());
         
-        // Обновляем список игроков каждые 2 секунды
         setInterval(() => updatePlayersList(), 2000);
         setInterval(() => syncWithOtherTabs(), 1000);
         
-        window.addEventListener('resize', () => {
-            setTimeout(() => {
-                calculateOptimalGrid();
-                loadFromLocal();
-                drawCanvas();
-            }, 100);
-        });
+        window.addEventListener('resize', () => clampAndCenter());
         
         document.body.addEventListener("click", () => {
             if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
         }, { once: true });
         
-        setTimeout(() => drawCanvas(), 100);
+        setTimeout(() => clampAndCenter(), 100);
     }
     
     init();
