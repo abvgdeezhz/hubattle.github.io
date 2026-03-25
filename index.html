@@ -331,6 +331,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
 
 <script>
     // ========== КОНФИГУРАЦИЯ FIREBASE ==========
@@ -351,7 +352,7 @@
     const playersRef = db.ref('players');
     const configRef = db.ref('config');
 
-    // ========== ПАРАМЕТРЫ ИГРЫ (НОВЫЙ РАЗМЕР 500x250) ==========
+    // ========== ПАРАМЕТРЫ ИГРЫ ==========
     let MAP_WIDTH = 500;
     let MAP_HEIGHT = 250;
     const PIXEL_SIZE = 12;          // размер одной ячейки в пикселях на экране
@@ -371,7 +372,7 @@
 
     let pixelMap = [];
     let totalPlaced = 0;
-    let currentUser = null;
+    let currentUser = null;           // { uid, nickname, avatar }
     let userLastPlaceTime = 0;
     let selectedColor = PALETTE[0];
 
@@ -389,6 +390,19 @@
     let lastCooldownState = 0;
     let cooldownInterval = null;
     let heartbeatInterval = null;
+
+    // ========== АУТЕНТИФИКАЦИЯ ==========
+    async function initAuth() {
+        try {
+            const result = await firebase.auth().signInAnonymously();
+            const uid = result.user.uid;
+            console.log("Анонимный вход выполнен, uid:", uid);
+            return uid;
+        } catch (error) {
+            console.error("Ошибка аутентификации:", error);
+            return null;
+        }
+    }
 
     // ========== ЗАГРУЗКА РАЗМЕРОВ ХОЛСТА ==========
     function loadConfig() {
@@ -473,8 +487,8 @@
     // ========== ИГРОКИ ОНЛАЙН ==========
     function updatePlayerPresence() {
         if (!currentUser) return;
-        const userRef = playersRef.child(currentUser.username);
-        userRef.update({ lastSeen: Date.now(), avatar: currentUser.avatar });
+        const userRef = playersRef.child(currentUser.uid);
+        userRef.update({ lastSeen: Date.now(), avatar: currentUser.avatar, nickname: currentUser.nickname });
         userRef.onDisconnect().remove();
     }
 
@@ -488,7 +502,11 @@
             const playersData = snap.val() || {};
             const now = Date.now();
             const online = [];
-            for (const [name, data] of Object.entries(playersData)) if (now - data.lastSeen < 15000) online.push(name);
+            for (const [uid, data] of Object.entries(playersData)) {
+                if (now - data.lastSeen < 15000) {
+                    online.push({ uid, nickname: data.nickname || uid });
+                }
+            }
             updatePlayersUI(online);
         });
     }
@@ -496,7 +514,10 @@
     function updatePlayersUI(online) {
         const count = online.length;
         if (count === 0) playersPanel.innerHTML = "👥 ожидание игроков...";
-        else { const list = online.map(name => name === currentUser?.username ? `⭐${name}⭐` : name).join(", "); playersPanel.innerHTML = `👥 онлайн (${count}): ${list}`; }
+        else {
+            const list = online.map(p => p.uid === currentUser?.uid ? `⭐${p.nickname}⭐` : p.nickname).join(", ");
+            playersPanel.innerHTML = `👥 онлайн (${count}): ${list}`;
+        }
         if (playersCountSpan) playersCountSpan.innerText = count;
     }
 
@@ -621,39 +642,30 @@
         cooldownInterval = setInterval(updateCooldownUI, 200);
     }
 
-    // ========== УСТАНОВКА ПИКСЕЛЯ (с транзакцией на кулдаун и блокировкой) ==========
+    // ========== УСТАНОВКА ПИКСЕЛЯ (серверный кулдаун через правила) ==========
     async function placePixel(index, colorHex) {
         if (!currentUser) return false;
         if (isPlacingPixel) return false;
-        if (!isCooldownReady) return false;   // ждём загрузки lastPlaceTime
-        if (isOnCooldown()) return false;
+        if (!isCooldownReady) return false;
+        if (isOnCooldown()) return false;  // локальная проверка для UI
 
         isPlacingPixel = true;
         try {
-            const userTimeRef = playersRef.child(currentUser.username).child('lastPlaceTime');
-            const transactionResult = await userTimeRef.transaction(currentTime => {
-                const now = Date.now();
-                const last = currentTime || 0;
-                if (now - last < COOLDOWN_SECONDS * 1000) {
-                    return; // отмена транзакции — кулдаун не прошёл
-                }
-                return firebase.database.ServerValue.TIMESTAMP;
-            });
-
-            if (!transactionResult.committed) {
-                // кулдаун ещё активен (или ошибка)
-                return false;
-            }
-
-            // Транзакция успешна — время обновлено, теперь ставим пиксель
+            // Пытаемся установить пиксель. Правила Firebase проверят lastPlaceTime.
             await mapRef.child(index).set(colorHex);
             totalPlaced++;
             await totalRef.set(totalPlaced);
             drawCanvas();
             updateStats();
+
+            // После успешной установки обновим локальное lastPlaceTime
+            // (можно подождать, пока сработает слушатель, но для UI лучше сразу)
+            userLastPlaceTime = Date.now();
+            updateCooldownUI();
             return true;
         } catch (err) {
-            console.error("Ошибка установки пикселя:", err);
+            // Ошибка скорее всего из-за кулдауна (правила отклонили)
+            console.warn("Ошибка установки пикселя (возможно кулдаун):", err);
             return false;
         } finally {
             isPlacingPixel = false;
@@ -668,25 +680,21 @@
 
     // ========== АВТЕНТИФИКАЦИЯ ==========
     // Инициализация кулдауна при входе
-    async function initUserCooldown() {
-        const userRef = playersRef.child(currentUser.username);
-        await userRef.update({ avatar: currentUser.avatar });
+    async function initUserCooldown(uid) {
+        const userRef = playersRef.child(uid);
         const snap = await userRef.child('lastPlaceTime').once('value');
-        if (snap.val() === null) {
-            await userRef.child('lastPlaceTime').set(0);
-        }
         userLastPlaceTime = snap.val() || 0;
         isCooldownReady = true;
         updateCooldownUI();
 
-        // подписываемся на изменения
+        // подписываемся на изменения lastPlaceTime (например, если кулдаун изменится на сервере)
         userRef.child('lastPlaceTime').on('value', (snap) => {
             userLastPlaceTime = snap.val() || 0;
             updateCooldownUI();
         });
     }
 
-    function showNicknameModal() {
+    async function showNicknameModal() {
         const modal = document.createElement('div');
         modal.className = 'nickname-modal';
         modal.innerHTML = `<div class="modal-content"><h3>🔥 Вход в HuBattle</h3><input type="text" id="nicknameInput" placeholder="Введите ваш никнейм" maxlength="20" autocomplete="off"><button id="confirmAuthBtn">⚡ Войти</button></div>`;
@@ -694,30 +702,63 @@
         const input = modal.querySelector('#nicknameInput');
         const confirmBtn = modal.querySelector('#confirmAuthBtn');
         input.focus();
+
         const doAuth = async () => {
             let nickname = input.value.trim();
             if (!nickname) nickname = "Гость_" + Math.floor(Math.random() * 1000);
-            currentUser = { username: nickname, avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}` };
-            localStorage.setItem("hubattle_username", nickname);
+
+            // Получаем uid через анонимную аутентификацию
+            const uid = await initAuth();
+            if (!uid) {
+                alert("Ошибка аутентификации, попробуйте позже");
+                modal.remove();
+                return;
+            }
+
+            currentUser = {
+                uid: uid,
+                nickname: nickname,
+                avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`
+            };
+
+            // Сохраняем ник и аватар в базе
+            const userRef = playersRef.child(uid);
+            await userRef.update({
+                nickname: nickname,
+                avatar: currentUser.avatar,
+                lastSeen: Date.now()
+            });
+            // Убедимся, что lastPlaceTime существует
+            const timeSnap = await userRef.child('lastPlaceTime').once('value');
+            if (timeSnap.val() === null) {
+                await userRef.child('lastPlaceTime').set(0);
+            }
+
+            localStorage.setItem("hubattle_uid", uid);
+            localStorage.setItem("hubattle_nickname", nickname);
+
             updateAuthUI();
             startCooldownTimerLoop();
             updatePlayerPresence();
             startHeartbeat();
-            await initUserCooldown();   // загружаем lastPlaceTime и включаем возможность кликов
+            await initUserCooldown(uid);
             modal.remove();
         };
+
         confirmBtn.addEventListener('click', doAuth);
         input.addEventListener('keypress', (e) => { if (e.key === 'Enter') doAuth(); });
     }
 
     function logout() {
         if (currentUser) {
-            playersRef.child(currentUser.username).child('lastPlaceTime').off(); // отписываемся
-            playersRef.child(currentUser.username).remove();
+            playersRef.child(currentUser.uid).child('lastPlaceTime').off();
+            playersRef.child(currentUser.uid).remove();
+            firebase.auth().signOut();
         }
         currentUser = null;
         isCooldownReady = false;
-        localStorage.removeItem("hubattle_username");
+        localStorage.removeItem("hubattle_uid");
+        localStorage.removeItem("hubattle_nickname");
         updateAuthUI();
         if (cooldownInterval) clearInterval(cooldownInterval);
         cooldownInterval = null;
@@ -733,7 +774,7 @@
             widget.innerHTML = `<button class="login-btn" id="loginBtn">🔥 Войти</button>`;
             document.getElementById("loginBtn")?.addEventListener("click", showNicknameModal);
         } else {
-            widget.innerHTML = `<div class="user-info"><img class="avatar" src="${currentUser.avatar}"><span class="username">${escapeHtml(currentUser.username)}</span><button class="logout-btn" id="logoutBtn">выйти</button></div>`;
+            widget.innerHTML = `<div class="user-info"><img class="avatar" src="${currentUser.avatar}"><span class="username">${escapeHtml(currentUser.nickname)}</span><button class="logout-btn" id="logoutBtn">выйти</button></div>`;
             document.getElementById("logoutBtn")?.addEventListener("click", logout);
         }
     }
@@ -789,8 +830,32 @@
         });
     }
 
+    // ========== ВОССТАНОВЛЕНИЕ СЕССИИ ==========
+    async function restoreSession() {
+        const savedUid = localStorage.getItem("hubattle_uid");
+        const savedNickname = localStorage.getItem("hubattle_nickname");
+        if (savedUid && savedNickname) {
+            // Проверим, что пользователь всё ещё аутентифицирован
+            const currentAuthUser = firebase.auth().currentUser;
+            if (currentAuthUser && currentAuthUser.uid === savedUid) {
+                currentUser = {
+                    uid: savedUid,
+                    nickname: savedNickname,
+                    avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(savedNickname.slice(0,2))}`
+                };
+                updateAuthUI();
+                startCooldownTimerLoop();
+                updatePlayerPresence();
+                startHeartbeat();
+                await initUserCooldown(savedUid);
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
-    function init() {
+    async function init() {
         canvas = document.getElementById("battleCanvas");
         ctx = canvas.getContext("2d");
         container = document.getElementById("canvasContainer");
@@ -802,7 +867,7 @@
         playersPanel = document.getElementById("playersPanel");
 
         initMap();
-        loadConfig();      // загружает карту после получения размеров
+        loadConfig();
         listenForChanges();
         listenForPlayers();
 
@@ -816,15 +881,9 @@
         document.getElementById("zoomOutBtn")?.addEventListener("click", () => zoomAtPoint(-0.2, container.clientWidth/2, container.clientHeight/2));
         document.getElementById("resetViewBtn")?.addEventListener("click", resetView);
 
-        const savedUsername = localStorage.getItem("hubattle_username");
-        if (savedUsername) {
-            currentUser = { username: savedUsername, avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(savedUsername.slice(0,2))}` };
-            updateAuthUI();
-            startCooldownTimerLoop();
-            updatePlayerPresence();
-            startHeartbeat();
-            initUserCooldown();   // загружаем lastPlaceTime для восстановленного пользователя
-        } else {
+        // Пытаемся восстановить сессию
+        const restored = await restoreSession();
+        if (!restored) {
             updateAuthUI();
         }
 
