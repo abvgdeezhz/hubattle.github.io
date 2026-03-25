@@ -406,6 +406,7 @@
 
     // ========== ЗАГРУЗКА РАЗМЕРОВ ХОЛСТА ==========
     function loadConfig() {
+       configRef.set({ width: 500, height: 250 });
         configRef.once('value', (snap) => {
             const cfg = snap.val();
             if (cfg && cfg.width && cfg.height) {
