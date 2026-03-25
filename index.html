@@ -323,6 +323,7 @@
         <button class="zoom-btn" id="zoomOutBtn">−</button>
         <button class="zoom-btn" id="zoomInBtn">+</button>
         <button class="zoom-btn" id="resetViewBtn">⌗</button>
+        <button class="zoom-btn" id="fitScreenBtn">⛶</button>
     </div>
     <div class="players-panel" id="playersPanel">
         👥 загрузка...
@@ -355,7 +356,7 @@
     // ========== ПАРАМЕТРЫ ИГРЫ ==========
     let MAP_WIDTH = 500;
     let MAP_HEIGHT = 250;
-    const PIXEL_SIZE = 12;          // размер одной ячейки в пикселях на экране
+    const PIXEL_SIZE = 12;
     const COOLDOWN_SECONDS = 3;
     const HEARTBEAT_INTERVAL = 5000;
 
@@ -372,11 +373,10 @@
 
     let pixelMap = [];
     let totalPlaced = 0;
-    let currentUser = null;           // { uid, nickname, avatar }
+    let currentUser = null;
     let userLastPlaceTime = 0;
     let selectedColor = PALETTE[0];
 
-    // Флаги для защиты от параллельных установок и ожидания загрузки кулдауна
     let isPlacingPixel = false;
     let isCooldownReady = false;
 
@@ -395,18 +395,25 @@
     async function initAuth() {
         try {
             const result = await firebase.auth().signInAnonymously();
-            const uid = result.user.uid;
-            console.log("Анонимный вход выполнен, uid:", uid);
-            return uid;
+            console.log("Анонимный вход выполнен, uid:", result.user.uid);
+            return result.user.uid;
         } catch (error) {
             console.error("Ошибка аутентификации:", error);
+            let message = "Не удалось войти. ";
+            if (error.code === 'auth/operation-not-allowed') {
+                message += "Включите анонимный вход в консоли Firebase (Authentication → Sign-in method → Anonymous).";
+            } else if (error.code === 'auth/network-request-failed') {
+                message += "Проверьте интернет-соединение.";
+            } else {
+                message += error.message;
+            }
+            alert(message);
             return null;
         }
     }
 
     // ========== ЗАГРУЗКА РАЗМЕРОВ ХОЛСТА ==========
     function loadConfig() {
-       configRef.set({ width: 500, height: 250 });
         configRef.once('value', (snap) => {
             const cfg = snap.val();
             if (cfg && cfg.width && cfg.height) {
@@ -446,6 +453,8 @@
             }
             drawCanvas();
             updateStats();
+            // после загрузки карты подстроить масштаб под экран
+            fitToScreen();
         });
         totalRef.once('value', (snap) => {
             if (snap.val() !== null) totalPlaced = snap.val();
@@ -481,6 +490,7 @@
                 MAP_HEIGHT = cfg.height;
                 loadMapFromFirebase();
                 resetView();
+                fitToScreen();
             }
         });
     }
@@ -545,12 +555,13 @@
         }
     }
 
-    // ========== ЗУМ ==========
+    // ========== ЗУМ И ПАН ==========
     function zoomAtPoint(delta, clientX, clientY) {
         if (!canvas || !container) return;
         const oldScale = scale;
         let newScale = scale + delta;
-        newScale = Math.min(5, Math.max(0.5, newScale));
+        // Расширяем диапазон: минимум 0.1, максимум 10
+        newScale = Math.min(10, Math.max(0.1, newScale));
         if (newScale === oldScale) return;
         const containerRect = container.getBoundingClientRect();
         const mouseX = clientX - containerRect.left;
@@ -572,6 +583,22 @@
         scale = 1;
         offsetX = 0;
         offsetY = 0;
+        drawCanvas();
+    }
+
+    function fitToScreen() {
+        if (!canvas || !container) return;
+        const containerRect = container.getBoundingClientRect();
+        const canvasWidth = MAP_WIDTH * PIXEL_SIZE;
+        const canvasHeight = MAP_HEIGHT * PIXEL_SIZE;
+        // Масштаб, чтобы холст помещался в контейнер с отступами 20px
+        const scaleX = (containerRect.width - 40) / canvasWidth;
+        const scaleY = (containerRect.height - 40) / canvasHeight;
+        scale = Math.min(scaleX, scaleY, 1); // не больше 1, чтобы не было слишком крупно
+        scale = Math.max(scale, 0.1); // но не меньше 0.1
+        // Центрируем холст
+        offsetX = (containerRect.width - canvasWidth * scale) / 2;
+        offsetY = (containerRect.height - canvasHeight * scale) / 2;
         drawCanvas();
     }
 
@@ -643,29 +670,24 @@
         cooldownInterval = setInterval(updateCooldownUI, 200);
     }
 
-    // ========== УСТАНОВКА ПИКСЕЛЯ (серверный кулдаун через правила) ==========
+    // ========== УСТАНОВКА ПИКСЕЛЯ ==========
     async function placePixel(index, colorHex) {
         if (!currentUser) return false;
         if (isPlacingPixel) return false;
         if (!isCooldownReady) return false;
-        if (isOnCooldown()) return false;  // локальная проверка для UI
+        if (isOnCooldown()) return false;
 
         isPlacingPixel = true;
         try {
-            // Пытаемся установить пиксель. Правила Firebase проверят lastPlaceTime.
             await mapRef.child(index).set(colorHex);
             totalPlaced++;
             await totalRef.set(totalPlaced);
             drawCanvas();
             updateStats();
-
-            // После успешной установки обновим локальное lastPlaceTime
-            // (можно подождать, пока сработает слушатель, но для UI лучше сразу)
             userLastPlaceTime = Date.now();
             updateCooldownUI();
             return true;
         } catch (err) {
-            // Ошибка скорее всего из-за кулдауна (правила отклонили)
             console.warn("Ошибка установки пикселя (возможно кулдаун):", err);
             return false;
         } finally {
@@ -679,8 +701,7 @@
         if (idx !== -1) placePixel(idx, selectedColor);
     }
 
-    // ========== АВТЕНТИФИКАЦИЯ ==========
-    // Инициализация кулдауна при входе
+    // ========== АВТЕНТИФИКАЦИЯ ПОЛЬЗОВАТЕЛЯ ==========
     async function initUserCooldown(uid) {
         const userRef = playersRef.child(uid);
         const snap = await userRef.child('lastPlaceTime').once('value');
@@ -688,7 +709,6 @@
         isCooldownReady = true;
         updateCooldownUI();
 
-        // подписываемся на изменения lastPlaceTime (например, если кулдаун изменится на сервере)
         userRef.child('lastPlaceTime').on('value', (snap) => {
             userLastPlaceTime = snap.val() || 0;
             updateCooldownUI();
@@ -708,10 +728,8 @@
             let nickname = input.value.trim();
             if (!nickname) nickname = "Гость_" + Math.floor(Math.random() * 1000);
 
-            // Получаем uid через анонимную аутентификацию
             const uid = await initAuth();
             if (!uid) {
-                alert("Ошибка аутентификации, попробуйте позже");
                 modal.remove();
                 return;
             }
@@ -722,14 +740,12 @@
                 avatar: `https://ui-avatars.com/api/?background=ff6b6b&color=fff&rounded=true&size=64&bold=true&fontsize=0.6&name=${encodeURIComponent(nickname.slice(0,2))}`
             };
 
-            // Сохраняем ник и аватар в базе
             const userRef = playersRef.child(uid);
             await userRef.update({
                 nickname: nickname,
                 avatar: currentUser.avatar,
                 lastSeen: Date.now()
             });
-            // Убедимся, что lastPlaceTime существует
             const timeSnap = await userRef.child('lastPlaceTime').once('value');
             if (timeSnap.val() === null) {
                 await userRef.child('lastPlaceTime').set(0);
@@ -836,7 +852,6 @@
         const savedUid = localStorage.getItem("hubattle_uid");
         const savedNickname = localStorage.getItem("hubattle_nickname");
         if (savedUid && savedNickname) {
-            // Проверим, что пользователь всё ещё аутентифицирован
             const currentAuthUser = firebase.auth().currentUser;
             if (currentAuthUser && currentAuthUser.uid === savedUid) {
                 currentUser = {
@@ -881,8 +896,8 @@
         document.getElementById("zoomInBtn")?.addEventListener("click", () => zoomAtPoint(0.2, container.clientWidth/2, container.clientHeight/2));
         document.getElementById("zoomOutBtn")?.addEventListener("click", () => zoomAtPoint(-0.2, container.clientWidth/2, container.clientHeight/2));
         document.getElementById("resetViewBtn")?.addEventListener("click", resetView);
+        document.getElementById("fitScreenBtn")?.addEventListener("click", fitToScreen);
 
-        // Пытаемся восстановить сессию
         const restored = await restoreSession();
         if (!restored) {
             updateAuthUI();
