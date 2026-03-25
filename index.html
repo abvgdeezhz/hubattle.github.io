@@ -296,7 +296,7 @@
     <div class="top-bar">
         <div class="logo">
             <h1>🔥 HUBATTLE 🔥</h1>
-            <p>100x60 | битва за Ху Гарден</p>
+            <p>500x250 | битва за Ху Гарден</p>
         </div>
         <div class="auth-widget" id="authWidget"></div>
     </div>
@@ -352,8 +352,8 @@
     const configRef = db.ref('config');
 
     // ========== ПАРАМЕТРЫ ИГРЫ ==========
-    let MAP_WIDTH = 100;
-    let MAP_HEIGHT = 60;
+    let MAP_WIDTH = 500;
+    let MAP_HEIGHT = 250;
     const PIXEL_SIZE = 12;
     const COOLDOWN_SECONDS = 3;
     const HEARTBEAT_INTERVAL = 5000;
@@ -372,8 +372,12 @@
     let pixelMap = [];
     let totalPlaced = 0;
     let currentUser = null;
-    let userLastPlaceTime = 0;           // время последней установки пикселя (из Firebase)
+    let userLastPlaceTime = 0;
     let selectedColor = PALETTE[0];
+
+    // Флаги для защиты от параллельных установок и ожидания загрузки кулдауна
+    let isPlacingPixel = false;
+    let isCooldownReady = false;
 
     let canvas, ctx, container;
     let scale = 1, offsetX = 0, offsetY = 0;
@@ -617,30 +621,31 @@
         cooldownInterval = setInterval(updateCooldownUI, 200);
     }
 
-    // ========== УСТАНОВКА ПИКСЕЛЯ (с транзакцией на кулдаун) ==========
+    // ========== УСТАНОВКА ПИКСЕЛЯ (с транзакцией на кулдаун и блокировкой) ==========
     async function placePixel(index, colorHex) {
         if (!currentUser) return false;
+        if (isPlacingPixel) return false;
+        if (!isCooldownReady) return false;   // ждём загрузки lastPlaceTime
         if (isOnCooldown()) return false;
 
-        const userTimeRef = playersRef.child(currentUser.username).child('lastPlaceTime');
-
-        // Транзакция: проверяем и обновляем lastPlaceTime
-        const transactionResult = await userTimeRef.transaction(currentTime => {
-            const now = Date.now();
-            const last = currentTime || 0;
-            if (now - last < COOLDOWN_SECONDS * 1000) {
-                return; // отмена транзакции — кулдаун не прошёл
-            }
-            return firebase.database.ServerValue.TIMESTAMP;
-        });
-
-        if (!transactionResult.committed) {
-            // кулдаун ещё активен (или ошибка)
-            return false;
-        }
-
-        // Транзакция успешна — время обновлено, теперь ставим пиксель
+        isPlacingPixel = true;
         try {
+            const userTimeRef = playersRef.child(currentUser.username).child('lastPlaceTime');
+            const transactionResult = await userTimeRef.transaction(currentTime => {
+                const now = Date.now();
+                const last = currentTime || 0;
+                if (now - last < COOLDOWN_SECONDS * 1000) {
+                    return; // отмена транзакции — кулдаун не прошёл
+                }
+                return firebase.database.ServerValue.TIMESTAMP;
+            });
+
+            if (!transactionResult.committed) {
+                // кулдаун ещё активен (или ошибка)
+                return false;
+            }
+
+            // Транзакция успешна — время обновлено, теперь ставим пиксель
             await mapRef.child(index).set(colorHex);
             totalPlaced++;
             await totalRef.set(totalPlaced);
@@ -650,6 +655,8 @@
         } catch (err) {
             console.error("Ошибка установки пикселя:", err);
             return false;
+        } finally {
+            isPlacingPixel = false;
         }
     }
 
@@ -660,6 +667,25 @@
     }
 
     // ========== АВТЕНТИФИКАЦИЯ ==========
+    // Инициализация кулдауна при входе
+    async function initUserCooldown() {
+        const userRef = playersRef.child(currentUser.username);
+        await userRef.update({ avatar: currentUser.avatar });
+        const snap = await userRef.child('lastPlaceTime').once('value');
+        if (snap.val() === null) {
+            await userRef.child('lastPlaceTime').set(0);
+        }
+        userLastPlaceTime = snap.val() || 0;
+        isCooldownReady = true;
+        updateCooldownUI();
+
+        // подписываемся на изменения
+        userRef.child('lastPlaceTime').on('value', (snap) => {
+            userLastPlaceTime = snap.val() || 0;
+            updateCooldownUI();
+        });
+    }
+
     function showNicknameModal() {
         const modal = document.createElement('div');
         modal.className = 'nickname-modal';
@@ -677,20 +703,7 @@
             startCooldownTimerLoop();
             updatePlayerPresence();
             startHeartbeat();
-
-            // Создаём запись в players, если её нет, с lastPlaceTime = 0
-            const userRef = playersRef.child(currentUser.username);
-            await userRef.update({ avatar: currentUser.avatar });
-            const lastTimeSnap = await userRef.child('lastPlaceTime').once('value');
-            if (lastTimeSnap.val() === null) {
-                await userRef.child('lastPlaceTime').set(0);
-            }
-            // Подписываемся на изменения lastPlaceTime
-            userRef.child('lastPlaceTime').on('value', (snap) => {
-                userLastPlaceTime = snap.val() || 0;
-                updateCooldownUI();
-            });
-
+            await initUserCooldown();   // загружаем lastPlaceTime и включаем возможность кликов
             modal.remove();
         };
         confirmBtn.addEventListener('click', doAuth);
@@ -699,10 +712,11 @@
 
     function logout() {
         if (currentUser) {
-            playersRef.child(currentUser.username).remove();
             playersRef.child(currentUser.username).child('lastPlaceTime').off(); // отписываемся
+            playersRef.child(currentUser.username).remove();
         }
         currentUser = null;
+        isCooldownReady = false;
         localStorage.removeItem("hubattle_username");
         updateAuthUI();
         if (cooldownInterval) clearInterval(cooldownInterval);
@@ -809,16 +823,7 @@
             startCooldownTimerLoop();
             updatePlayerPresence();
             startHeartbeat();
-            // Подписываемся на lastPlaceTime
-            const userRef = playersRef.child(currentUser.username);
-            userRef.child('lastPlaceTime').once('value', (snap) => {
-                userLastPlaceTime = snap.val() || 0;
-                updateCooldownUI();
-            });
-            userRef.child('lastPlaceTime').on('value', (snap) => {
-                userLastPlaceTime = snap.val() || 0;
-                updateCooldownUI();
-            });
+            initUserCooldown();   // загружаем lastPlaceTime для восстановленного пользователя
         } else {
             updateAuthUI();
         }
